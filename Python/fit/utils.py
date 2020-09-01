@@ -1,6 +1,22 @@
 import numpy as np
-from geomdl import helpers as hlp
 
+
+def validate_knots(knots):
+    """ Ensures knots is a non-decreasing sequence """
+    kd = np.diff(knots)
+    if any(kd < 0):
+        raise ValueError('The knot sequence is non-decreasing.')
+    return
+
+
+def get_multiplicity(knots, knot):
+    """ Returns multiplicity for given knot
+
+    :param knots:   A non-decreasing finite vector of knots ([float])
+    :param knot:    The knot for which multiplicity is determined
+    """
+    validate_knots(knots)
+    return sum([1 for k in knots if k == knot])
 
 def is_clamped_end_knot(p, knots, u):
     """ True if the site u has multiplicity p+1 and is either the first or last knot.  Otherwise False
@@ -9,7 +25,7 @@ def is_clamped_end_knot(p, knots, u):
     :param knots:   A non-decreasing finite vector of knots ([float])
     :param u:       The site to evaluate (float)
     """
-    return (u == knots[0] or u == knots[-1]) and hlp.find_multiplicity(u, knots) == p + 1
+    return (u == knots[0] or u == knots[-1]) and get_multiplicity(knots, u) == p + 1
 
 
 def get_num_ctrlpts(p, knots):
