@@ -282,7 +282,58 @@ class TestFitBasisFunction(ut.TestCase):
         for j in np.append(np.arange(6), np.arange(7, m)):
             self.assertTrue(bfmatrix[j, icp].has_samecoef(poly(0)), 'Incorrect polynomial for N_{0},2 on [u_{1},u_{2})'.format(icp, j, j + 1))
 
-    
+    def test_get_collocation_matrix_p2_simpleknots(self):
+        p = 2
+        m = 4
+        n = m-p-1
+        numsites = 11
+        knots = np.arange(m+1)/m
+        sites = np.linspace(0, 1, numsites)
+        expected = np.zeros((numsites, n+1), dtype=np.float)
+        # N_0,2
+        expected[0:3,0] = [poly((0,0,8))(s) for s in sites[0:3]]
+        expected[3:5,0] = [poly((-1.5,12,-16))(s) for s in sites[3:5]]
+        expected[5:8,0] = [poly((4.5,-12,8))(s) for s in sites[5:8]]
+        # N_1,2
+        expected[3:5,1] = [poly((.5, -4, 8))(s) for s in sites[3:5]]
+        expected[5:8,1] = [poly((-5.5, 20, -16))(s) for s in sites[5:8]]
+        expected[8:,1] = [poly((8,-16,8))(s) for s in sites[8:]]
+        actual = bf.get_collocation_matrix(p, knots, sites)
+        self.assertEqual(expected.shape, actual.shape, 'Matrix is wrong size')
+        for si in range(numsites):
+            nptest.assert_array_almost_equal(expected[si], actual[si], err_msg='Incorrect values for site {0}'.format(sites[si]))
+
+    def test_get_collocation_matrix_p2_multipleknots(self):
+        p = 2
+        knots = np.array([0,0,0,0.3,0.5,0.5,0.6,1,1,1])
+        m = len(knots) - 1
+        n = m-p-1
+        numsites=11
+        sites = np.linspace(0,1,numsites)
+        expected = np.zeros((numsites, n+1), dtype=np.float)
+        # N_0,2
+        expected[0:3,0] = [(poly((1,-10 /3))**2)(s) for s in sites[0:3]]
+        # N_1,2
+        expected[0:3,1] = [(20/3*poly((0,1,-8/3)))(s)for s in sites[0:3]]
+        expected[3:5,1] = [(2.5*poly((1,-2))**2)(s) for s in sites[3:5]]
+        # N_2,2
+        expected[0:3,2] = [poly((0,0,20/3))(s)for s in sites[0:3]]
+        expected[3:5,2] = [poly((-3.75,25,-35))(s) for s in sites[3:5]]
+        # N_3,2
+        expected[3:5,3] = [(poly((-1.5,5))**2)(s) for s in sites[3:5]]
+        expected[5,3] = (poly((6,-10))**2)(sites[5])
+        # N_4,2
+        expected[5,4] = (20*poly((-2,7,-6)))(sites[5])
+        expected[6:,4] = [(5*poly((1,-1))**2)(s) for s in sites[6:]]
+        # N_5,2
+        expected[5,5] = poly((5,-20,20))(sites[5])
+        expected[6:,5] = [poly((-6.25,17.5,-11.25))(s) for s in sites[6:]]
+        # N_6,2
+        expected[6:,6] = [poly((2.25,-7.5,6.25))(s) for s in sites[6:]]
+        actual = bf.get_collocation_matrix(p, knots, sites)
+        self.assertEqual(expected.shape, actual.shape, 'Matrix is wrong size')
+        for si in range(numsites):
+            nptest.assert_array_almost_equal(expected[si], actual[si], err_msg='Incorrect values for site {0}'.format(sites[si]))
 
 
 

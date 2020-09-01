@@ -1,6 +1,7 @@
-from numpy.polynomial.polynomial import Polynomial as poly
+from functools import partial
 import numpy as np
-from .utils import get_num_ctrlpts, is_function_nonzero
+from numpy.polynomial.polynomial import Polynomial as poly
+from .utils import get_num_ctrlpts, is_function_nonzero, get_knotspan_start_idx
 
 
 def get_basis_function(icp, p, knots, iks):
@@ -48,6 +49,25 @@ def get_basis_functions(p, knots):
         fnzi = max(j-p, 0)      # index of first non-zero function for this knot span
         lnzi = min(j+1, n+1)    # index of last non-zero function for this knot span
         out[j, fnzi:lnzi] = [get_basis_function(i, p, knots, j) for i in range(fnzi, lnzi)]
+    return out
+
+
+def get_collocation_matrix(p, knots, sites):
+    """ Calculates collocation matrix given degree, knots, and a vector of sites
+
+    :param p:       integer degree of the B-spline (p in the B-spline discussion)
+    :param knots:   a float vector with the locations of knots for the B-spline (u_i in the B-spline discussion)
+    :param sites:   a float vector with the sites (x-values) for which basis functions should be calculated
+                    (u in the B-spline discussion)
+    :return:        The len(sites) x get_num_ctrlpts(degree, knots) collocation matrix A,
+                    where element A_{i,j} = N_{j,p}(x_i}
+    """
+    fn_matrix = get_basis_functions(p, knots)
+    num_cp = fn_matrix.shape[1]
+    out = np.empty((len(sites), num_cp), np.float)
+    for r in range(len(sites)):
+        iks = get_knotspan_start_idx(knots, sites[r])
+        out[r, :] = [fn_matrix[iks, c](sites[r]) for c in range(num_cp)]
     return out
 
 

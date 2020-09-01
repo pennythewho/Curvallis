@@ -18,6 +18,7 @@ def get_multiplicity(knots, knot):
     validate_knots(knots)
     return sum([1 for k in knots if k == knot])
 
+
 def is_clamped_end_knot(p, knots, u):
     """ True if the site u has multiplicity p+1 and is either the first or last knot.  Otherwise False
 
@@ -63,11 +64,7 @@ def is_function_nonzero(p, knots, icp, iks):
     return (0 <= iks < len(knots)) and (iks in range(icp, icp+p+1)) and (knots[iks + 1] - knots[iks] > 0)
 
 
-# def is_in_knotspan(knots, i, site):
-#     """ True if knots[i] <= site < knots[i+1], or if site == knots[-1] and i represents the last knot span of nonzero length
-#     Otherwise, False
-#     """
-#     return i == get_knotspan_start_idx(knots, site)
+
 
 
 
