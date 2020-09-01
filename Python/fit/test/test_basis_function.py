@@ -241,10 +241,48 @@ class TestFitBasisFunction(ut.TestCase):
         bfmatrix = bf.get_basis_functions(p, knots)
         self.assertEqual((m, n+1), bfmatrix.shape, 'Matrix is wrong shape')
         # N_0,2
-        self.assertTrue(bfmatrix[2,0].has_samecoef(poly((1, -10/3))**2), 'Incorrect polynomial for N_0,2 on [u_2,u_3)')
+        icp = 0
+        self.assertTrue(bfmatrix[2,icp].has_samecoef(poly((1, -10/3))**2), 'Incorrect polynomial for N_{0},2 on [u_2,u_3)'.format(icp))
         for j in np.append(np.arange(2), np.arange(3,m)):
-            self.assertTrue(bfmatrix[j,0].has_samecoef(poly(0)), 'Incorrect polynomial for N_0,2 on [u_{0},u_{1})'.format(j, j+1))
-        #
+            self.assertTrue(bfmatrix[j,icp].has_samecoef(poly(0)), 'Incorrect polynomial for N_{0},2 on [u_{1},u_{2})'.format(icp, j, j+1))
+        # N_1,2
+        icp = 1
+        self.assertTrue(bfmatrix[2,icp].has_samecoef(20/3*poly((0, 1, -8/3))), 'Incorrect polynomial for N_{0},2 on [u_2,u_3)'.format(icp))
+        self.assertTrue(bfmatrix[3,icp].has_samecoef(2.5*(poly((1,-2))**2)), 'Incorrect polynomial for N_{0},2 on [u_3,u_4)'.format(icp))
+        for j in np.append(np.arange(2), np.arange(4,m)):
+            self.assertTrue(bfmatrix[j,icp].has_samecoef(poly(0)), 'Incorrect polynomial for N_{0},2 on [u_{1},u_{2})'.format(icp, j, j+1))
+        # N_2,2
+        icp = 2
+        self.assertTrue(bfmatrix[2,icp].has_samecoef(poly((0,0,20/3))), 'Incorrect polynomial for N_{0},2 on [u_2,u_3)'.format(icp))
+        nptest.assert_almost_equal(bfmatrix[3,icp].coef, poly((-3.75,25,-35)).coef, err_msg='Incorrect polynomial for N_{0},2 on [u_3,u_4)'.format(icp))
+        for j in np.append(np.arange(2), np.arange(4,m)):
+            self.assertTrue(bfmatrix[j,icp].has_samecoef(poly(0)), 'Incorrect polynomial for N_{0},2 on [u_{1},u_{2})'.format(icp, j, j+1))
+        # N_3,2
+        icp = 3
+        nptest.assert_almost_equal(bfmatrix[3,icp].coef, (poly((-1.5,5))**2).coef, err_msg='Incorrect polynomial for N_{0},2 on [u_3,u_4)'.format(icp))
+        self.assertTrue(bfmatrix[4,icp].has_samecoef(poly(0)), 'Incorrect polynomial for N_{0},2 on [u_4,u_5)'.format(icp))
+        nptest.assert_almost_equal(bfmatrix[5,icp].coef, (poly((6,-10))**2).coef, err_msg='Incorrect polynomial for N_{0},2 on [u_5,u_6)'.format(icp))
+        for j in np.append(np.arange(3), np.arange(6,m)):
+            self.assertTrue(bfmatrix[j,icp].has_samecoef(poly(0)), 'Incorrect polynomial for N_{0},2 on [u_{1},u_{2})'.format(icp, j, j+1))
+        # N_4,2
+        icp = 4
+        nptest.assert_almost_equal(bfmatrix[5, icp].coef, (20*poly((-2,7,-6))).coef, err_msg='Incorrect polynomial for N_{0},2 on [u_5,u_6)'.format(icp))
+        self.assertTrue(bfmatrix[6, icp].has_samecoef(5*poly((1,-1))**2),  'Incorrect polynomial for N_{0},2 on [u_6,u_7)'.format(icp))
+        for j in np.append(np.arange(5), np.arange(7, m)):
+            self.assertTrue(bfmatrix[j, icp].has_samecoef(poly(0)), 'Incorrect polynomial for N_{0},2 on [u_{1},u_{2})'.format(icp, j, j + 1))
+        # N_5,2
+        icp = 5
+        nptest.assert_almost_equal(bfmatrix[5, icp].coef, poly((5,-20,20)).coef, err_msg='Incorrect polynomial for N_{0},2 on [u_5,u_6)'.format(icp))
+        self.assertTrue(bfmatrix[6, icp].has_samecoef(poly((-6.25,17.5,-11.25))), 'Incorrect polynomial for N_{0},2 on [u_6,u_7)'.format(icp))
+        for j in np.append(np.arange(5), np.arange(7, m)):
+            self.assertTrue(bfmatrix[j, icp].has_samecoef(poly(0)), 'Incorrect polynomial for N_{0},2 on [u_{1},u_{2})'.format(icp, j, j + 1))
+        # N_6,2
+        icp = 6
+        nptest.assert_almost_equal(bfmatrix[6, icp].coef, poly((2.25,-7.5,6.25)).coef, err_msg='Incorrect polynomial for N_{0},2 on [u_6,u_7)'.format(icp))
+        for j in np.append(np.arange(6), np.arange(7, m)):
+            self.assertTrue(bfmatrix[j, icp].has_samecoef(poly(0)), 'Incorrect polynomial for N_{0},2 on [u_{1},u_{2})'.format(icp, j, j + 1))
+
+    
 
 
 
