@@ -30,3 +30,24 @@ def get_basis_function(icp, p, knots, iks):
         raise ValueError('iks is out of range [0,{0}]'.format(m))
     # knot span [u_i, u_i+1) is only nonzero on N_i-p,p, N_i-p+1,p, ..., N_i,p
     return get_basis_function_internal(icp, p) if is_function_nonzero(p, knots, icp, iks) else poly(0)
+
+def get_basis_functions(p, knots):
+    """ Returns a matrix of Polynomials that indicate how basis functions should be calculated for various knot spans,
+    where out[j,i] = N_i,p for knot span [knots[j], knots[j+1]).
+
+    :param p:       the degree of the B-spline (positive integer)
+    :param knots:   the knot sequence to be used to divide the B-spline into pieces (iterable of floats)
+    :return:        an (m x n+1) matrix of Polynomials, where m + 1 is the number of knots, and
+                    n+1 is the number of control points and n=m-p-1.
+    """
+    m = len(knots) - 1
+    n = m-p-1
+    out = np.reshape(np.repeat(poly(0), m*(n+1)), (m, n+1))
+    # for knot span [u_i, u_i+1), the only nonzero basis functions are N_{i-p,p}, N_{i-p+1,p}, ... N_{i,p}
+    for j in range(m):  # for each knot span (row index)
+        fnzi = max(j-p, 0)      # index of first non-zero function for this knot span
+        lnzi = min(j+1, n+1)    # index of last non-zero function for this knot span
+        out[j, fnzi:lnzi] = [get_basis_function(i, p, knots, j) for i in range(fnzi, lnzi)]
+    return out
+
+
