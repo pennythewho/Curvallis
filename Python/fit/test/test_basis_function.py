@@ -10,6 +10,10 @@ class TestFitBasisFunction(ut.TestCase):
     def tearDown(self):
         pass
 
+    ###########################################################################
+    ## get_basis_function tests
+    ###########################################################################
+
     def test_get_basis_function_icp_out_of_range(self):
         m = 2
         knots = np.arange(m+1)
@@ -183,7 +187,6 @@ class TestFitBasisFunction(ut.TestCase):
             for icp in range(n+1):
                 self.assertTrue(bf.get_basis_function(icp,p,knots,iks,d).has_samecoef(poly(0)), 'Incorrect polynomial for icp={icp},iks={iks}')
 
-
     def test_get_basis_function_multiple_knots_p3_zerolengthspans(self):
         p = 3
         knots = np.array([1, 1, 2, 3, 3, 4, 4, 4, 5, 5, 5, 5])
@@ -285,6 +288,10 @@ class TestFitBasisFunction(ut.TestCase):
         for icp in range(8,n+1):
             self.assertTrue(bf.get_basis_function(icp, 3, knots, iks).has_samecoef(poly(0)))
 
+    ###########################################################################
+    ## get_basis_functions tests
+    ###########################################################################
+
     def test_get_basis_functions_simple(self):
         p = 2
         m = 4
@@ -302,6 +309,24 @@ class TestFitBasisFunction(ut.TestCase):
         self.assertTrue(bfmatrix[1,1].has_samecoef(poly((.5, -4, 8))), 'Incorrect polynomial for N_1,2 on [u_1,u_2)')
         self.assertTrue(bfmatrix[2,1].has_samecoef(poly((-5.5, 20, -16))), 'Incorrect polynomial for N_1,2 on [u_2,u_3)')
         self.assertTrue(bfmatrix[3,1].has_samecoef(poly((8, -16, 8))), 'Incorrect polynomial for N_1,2 on [u_3,u_4)')
+
+    def test_get_basis_functions_simpleknots_ddu(self):
+        p = 2
+        m = 4
+        knots = np.arange(m + 1) / m
+        n = m - p - 1
+        bfmatrix = bf.get_basis_functions(p, knots, der=1)
+        self.assertEqual((m, n + 1), bfmatrix.shape, 'Matrix is wrong shape')
+        # dN_0,2/du
+        self.assertTrue(bfmatrix[0, 0].has_samecoef(poly((0, 16))), 'Incorrect polynomial for dN_0,2/du on [u_0,u_1)')
+        self.assertTrue(bfmatrix[1, 0].has_samecoef(poly((12, -32))), 'Incorrect polynomial for dN_0,2/du on [u_1,u_2)')
+        self.assertTrue(bfmatrix[2, 0].has_samecoef(poly((-12, 16))), 'Incorrect polynomial for dN_0,2/du on [u_3,u_4)')
+        self.assertTrue(bfmatrix[3, 0].has_samecoef(poly(0)), 'Incorrect polynomial for dN_0,2/du on [u_3,u_4)')
+        # dN_1,2/du
+        self.assertTrue(bfmatrix[0, 1].has_samecoef(poly(0)), 'Incorrect polynomial for dN_1,2/du on [u_0,u_1)')
+        self.assertTrue(bfmatrix[1, 1].has_samecoef(poly((-4, 16))), 'Incorrect polynomial for dN_1,2/du on [u_1,u_2)')
+        self.assertTrue(bfmatrix[2, 1].has_samecoef(poly((20, -32))), 'Incorrect polynomial for dN_1,2/du on [u_2,u_3)')
+        self.assertTrue(bfmatrix[3, 1].has_samecoef(poly((-16, 16))), 'Incorrect polynomial for dN_1,2/du on [u_3,u_4)')
 
     def test_get_basis_functions_multipleknots(self):
         p = 2
@@ -352,6 +377,59 @@ class TestFitBasisFunction(ut.TestCase):
         for j in np.append(np.arange(6), np.arange(7, m)):
             self.assertTrue(bfmatrix[j, icp].has_samecoef(poly(0)), 'Incorrect polynomial for N_{0},2 on [u_{1},u_{2})'.format(icp, j, j + 1))
 
+    def test_get_basis_functions_multipleknots_ddu(self):
+        p = 2
+        knots = np.append(np.append(np.repeat(0, p + 1), [.3, .5, .5, .6]), np.repeat(1, p + 1))
+        m = len(knots) - 1
+        n = m-p-1
+        bfmatrix = bf.get_basis_functions(p, knots, der=1)
+        self.assertEqual((m, n+1), bfmatrix.shape, 'Matrix is wrong shape')
+        # dN_0,2/du
+        icp = 0
+        nptest.assert_array_almost_equal(bfmatrix[2,icp].coef, poly((-20/3, 200/9)).coef, err_msg='Incorrect polynomial for dN_{0},2/du on [u_2,u_3)'.format(icp))
+        for j in np.append(np.arange(2), np.arange(3,m)):
+            self.assertTrue(bfmatrix[j,icp].has_samecoef(poly(0)), 'Incorrect polynomial for N_{icp},2 on [u_{j},u_{0})'.format(j+1, **locals()))
+        # dN_1,2
+        icp = 1
+        self.assertTrue(bfmatrix[2,icp].has_samecoef(20/3*poly((1, -16/3))), 'Incorrect polynomial for dN_{0},2/du on [u_2,u_3)'.format(icp))
+        self.assertTrue(bfmatrix[3,icp].has_samecoef(2.5*poly((-4,8))), 'Incorrect polynomial for dN_{0},2/du on [u_3,u_4)'.format(icp))
+        for j in np.append(np.arange(2), np.arange(4,m)):
+            self.assertTrue(bfmatrix[j,icp].has_samecoef(poly(0)), 'Incorrect polynomial for dN_{0},2/du on [u_{1},u_{2})'.format(icp, j, j+1))
+        # dN_2,2
+        icp = 2
+        self.assertTrue(bfmatrix[2,icp].has_samecoef(poly((0,40/3))), 'Incorrect polynomial for dN_{0},2/du on [u_2,u_3)'.format(icp))
+        self.assertTrue(bfmatrix[3,icp].has_samecoef(poly((25,-70))), 'Incorrect polynomial for dN_{0},2/du on [u_3,u_4)'.format(icp))
+        for j in np.append(np.arange(2), np.arange(4,m)):
+            self.assertTrue(bfmatrix[j,icp].has_samecoef(poly(0)), 'Incorrect polynomial for dN_{0},2/du on [u_{1},u_{2})'.format(icp, j, j+1))
+        # dN_3,2
+        icp = 3
+        nptest.assert_array_almost_equal(bfmatrix[3,icp].coef, poly((-15,50)).coef, err_msg='Incorrect polynomial for dN_{0},2/du on [u_3,u_4)'.format(icp))
+        self.assertTrue(bfmatrix[4,icp].has_samecoef(poly(0)), 'Incorrect polynomial for dN_{0},2/du on [u_4,u_5)'.format(icp))
+        nptest.assert_array_almost_equal(bfmatrix[5,icp].coef, poly((-120,200)).coef, err_msg='Incorrect polynomial for dN_{0},2/du on [u_5,u_6)'.format(icp))
+        for j in np.append(np.arange(3), np.arange(6,m)):
+            self.assertTrue(bfmatrix[j,icp].has_samecoef(poly(0)), 'Incorrect polynomial for dN_{0},2/du on [u_{1},u_{2})'.format(icp, j, j+1))
+        # dN_4,2
+        icp = 4
+        nptest.assert_array_almost_equal(bfmatrix[5, icp].coef, (20*poly((7, -12))).coef, err_msg='Incorrect polynomial for dN_{0},2/du on [u_5,u_6)'.format(icp))
+        self.assertTrue(bfmatrix[6, icp].has_samecoef(5*poly((-2,2))),  'Incorrect polynomial for dN_{0},2/du on [u_6,u_7)'.format(icp))
+        for j in np.append(np.arange(5), np.arange(7, m)):
+            self.assertTrue(bfmatrix[j, icp].has_samecoef(poly(0)), 'Incorrect polynomial for dN_{0},2/du on [u_{1},u_{2})'.format(icp, j, j + 1))
+        # N_5,2
+        icp = 5
+        nptest.assert_array_almost_equal(bfmatrix[5, icp].coef, poly((-20,40)).coef, err_msg='Incorrect polynomial for dN_{0},2/du on [u_5,u_6)'.format(icp))
+        self.assertTrue(bfmatrix[6, icp].has_samecoef(poly((17.5,-22.5))), 'Incorrect polynomial for dN_{0},2/du on [u_6,u_7)'.format(icp))
+        for j in np.append(np.arange(5), np.arange(7, m)):
+            self.assertTrue(bfmatrix[j, icp].has_samecoef(poly(0)), 'Incorrect polynomial for N_{0},2 on [u_{1},u_{2})'.format(icp, j, j + 1))
+        # N_6,2
+        icp = 6
+        nptest.assert_array_almost_equal(bfmatrix[6, icp].coef, poly((-7.5,12.5)).coef, err_msg='Incorrect polynomial for N_{0},2 on [u_6,u_7)'.format(icp))
+        for j in np.append(np.arange(6), np.arange(7, m)):
+            self.assertTrue(bfmatrix[j, icp].has_samecoef(poly(0)), 'Incorrect polynomial for N_{0},2 on [u_{1},u_{2})'.format(icp, j, j + 1))
+
+    ###########################################################################
+    ## get_collocation_matrix tests
+    ###########################################################################
+
     def test_get_collocation_matrix_p2_simpleknots(self):
         p = 2
         m = 4
@@ -369,6 +447,27 @@ class TestFitBasisFunction(ut.TestCase):
         expected[5:8,1] = [poly((-5.5, 20, -16))(s) for s in sites[5:8]]
         expected[8:,1] = [poly((8,-16,8))(s) for s in sites[8:]]
         actual = bf.get_collocation_matrix(p, knots, sites)
+        self.assertEqual(expected.shape, actual.shape, 'Matrix is wrong size')
+        for si in range(numsites):
+            nptest.assert_array_almost_equal(expected[si], actual[si], err_msg='Incorrect values for site {0}'.format(sites[si]))
+
+    def test_get_collocation_matrix_p2_simpleknots_ddu(self):
+        p = 2
+        m = 4
+        n = m-p-1
+        numsites = 11
+        knots = np.arange(m+1)/m
+        sites = np.linspace(0, 1, numsites)
+        expected = np.zeros((numsites, n+1), dtype=np.float)
+        # N_0,2
+        expected[0:3,0] = [poly((0,16))(s) for s in sites[0:3]]
+        expected[3:5,0] = [poly((12,-32))(s) for s in sites[3:5]]
+        expected[5:8,0] = [poly((-12,16))(s) for s in sites[5:8]]
+        # N_1,2
+        expected[3:5,1] = [poly((-4, 16))(s) for s in sites[3:5]]
+        expected[5:8,1] = [poly((20, -32))(s) for s in sites[5:8]]
+        expected[8:,1] = [poly((-16,16))(s) for s in sites[8:]]
+        actual = bf.get_collocation_matrix(p, knots, sites, der=1)
         self.assertEqual(expected.shape, actual.shape, 'Matrix is wrong size')
         for si in range(numsites):
             nptest.assert_array_almost_equal(expected[si], actual[si], err_msg='Incorrect values for site {0}'.format(sites[si]))
@@ -401,6 +500,38 @@ class TestFitBasisFunction(ut.TestCase):
         # N_6,2
         expected[6:,6] = [poly((2.25,-7.5,6.25))(s) for s in sites[6:]]
         actual = bf.get_collocation_matrix(p, knots, sites)
+        self.assertEqual(expected.shape, actual.shape, 'Matrix is wrong size')
+        for si in range(numsites):
+            nptest.assert_array_almost_equal(expected[si], actual[si], err_msg='Incorrect values for site {0}'.format(sites[si]))
+
+    def test_get_collocation_matrix_p2_multipleknots_ddu(self):
+        p = 2
+        knots = np.array([0,0,0,0.3,0.5,0.5,0.6,1,1,1])
+        m = len(knots) - 1
+        n = m-p-1
+        numsites=11
+        sites = np.linspace(0,1,numsites)
+        expected = np.zeros((numsites, n+1), dtype=np.float)
+        # N_0,2
+        expected[0:3,0] = [(poly((-20/3,200/9)))(s) for s in sites[0:3]]
+        # N_1,2
+        expected[0:3,1] = [(20/3*poly((1,-16/3)))(s)for s in sites[0:3]]
+        expected[3:5,1] = [(2.5*poly((-4,8)))(s) for s in sites[3:5]]
+        # N_2,2
+        expected[0:3,2] = [poly((0,40/3))(s)for s in sites[0:3]]
+        expected[3:5,2] = [poly((25,-70))(s) for s in sites[3:5]]
+        # N_3,2
+        expected[3:5,3] = [(poly((-15,50)))(s) for s in sites[3:5]]
+        expected[5,3] = (poly((-120,200)))(sites[5])
+        # N_4,2
+        expected[5,4] = (20*poly((7,-12)))(sites[5])
+        expected[6:,4] = [(5*poly((-2,2)))(s) for s in sites[6:]]
+        # N_5,2
+        expected[5,5] = poly((-20,40))(sites[5])
+        expected[6:,5] = [poly((17.5,-22.5))(s) for s in sites[6:]]
+        # N_6,2
+        expected[6:,6] = [poly((-7.5,12.5))(s) for s in sites[6:]]
+        actual = bf.get_collocation_matrix(p, knots, sites, der=1)
         self.assertEqual(expected.shape, actual.shape, 'Matrix is wrong size')
         for si in range(numsites):
             nptest.assert_array_almost_equal(expected[si], actual[si], err_msg='Incorrect values for site {0}'.format(sites[si]))

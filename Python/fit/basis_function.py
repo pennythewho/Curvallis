@@ -12,7 +12,7 @@ def get_basis_function(icp, p, knots, iks, der=0):
     :param p:       The degree of the B-spline (int p)
     :param knots:   The knot sequence used by the B-spline ([float] of length m)
     :param iks:     A knot span index indicating range of values [u_iks, u_iks+1)
-    :param der:     The derivative to take (int >= 0)
+    :param der:     The derivative to take (int >= 0).  Defaults to 0.
     :return:        A Polynomial to calculate the basis function for u in the specified knot span
     """
     def get_basis_function_internal(i, p):
@@ -35,12 +35,13 @@ def get_basis_function(icp, p, knots, iks, der=0):
     return f if der == 0 else f.deriv(der)
 
 
-def get_basis_functions(p, knots):
+def get_basis_functions(p, knots, der=0):
     """ Returns a matrix of Polynomials that indicate how basis functions should be calculated for various knot spans,
     where out[j,i] = N_i,p for knot span [knots[j], knots[j+1]).
 
     :param p:       the degree of the B-spline (positive integer)
     :param knots:   the knot sequence to be used to divide the B-spline into pieces (iterable of floats)
+    :param der:     The derivative to take (int >= 0).  Defaults to 0.
     :return:        an (m x n+1) matrix of Polynomials, where m + 1 is the number of knots, and
                     n+1 is the number of control points and n=m-p-1.
     """
@@ -51,21 +52,22 @@ def get_basis_functions(p, knots):
     for j in range(m):  # for each knot span (row index)
         fnzi = max(j-p, 0)      # index of first non-zero function for this knot span
         lnzi = min(j+1, n+1)    # index of last non-zero function for this knot span
-        out[j, fnzi:lnzi] = [get_basis_function(i, p, knots, j) for i in range(fnzi, lnzi)]
+        out[j, fnzi:lnzi] = [get_basis_function(i, p, knots, j, der) for i in range(fnzi, lnzi)]
     return out
 
 
-def get_collocation_matrix(p, knots, sites):
+def get_collocation_matrix(p, knots, sites, der=0):
     """ Calculates collocation matrix given degree, knots, and a vector of sites
 
     :param p:       integer degree of the B-spline (p in the B-spline discussion)
     :param knots:   a float vector with the locations of knots for the B-spline (u_i in the B-spline discussion)
     :param sites:   a float vector with the sites (x-values) for which basis functions should be calculated
                     (u in the B-spline discussion)
+    :param der:     The derivative to take (int >= 0).  Defaults to 0
     :return:        The len(sites) x get_num_ctrlpts(degree, knots) collocation matrix A,
                     where element A_{i,j} = N_{j,p}(x_i}
     """
-    fn_matrix = get_basis_functions(p, knots)
+    fn_matrix = get_basis_functions(p, knots, der)
     num_cp = fn_matrix.shape[1]
     out = np.empty((len(sites), num_cp), np.float)
     for r in range(len(sites)):
