@@ -4,7 +4,7 @@ from numpy.polynomial.polynomial import Polynomial as poly
 from .utils import get_num_ctrlpts, is_function_nonzero, get_knotspan_start_idx
 
 
-def get_basis_function(icp, p, knots, iks):
+def get_basis_function(icp, p, knots, iks, der=0):
     """ Returns a Polynomial for calculating basis function N_icp,degree in knot span [u_iks, u_iks+1)
 
     :param icp:     The index of the control point for which this function will be the coefficient (int i),
@@ -12,6 +12,7 @@ def get_basis_function(icp, p, knots, iks):
     :param p:       The degree of the B-spline (int p)
     :param knots:   The knot sequence used by the B-spline ([float] of length m)
     :param iks:     A knot span index indicating range of values [u_iks, u_iks+1)
+    :param der:     The derivative to take (int >= 0)
     :return:        A Polynomial to calculate the basis function for u in the specified knot span
     """
     def get_basis_function_internal(i, p):
@@ -30,7 +31,9 @@ def get_basis_function(icp, p, knots, iks):
     if (iks < 0) or (iks > m):
         raise ValueError('iks is out of range [0,{0}]'.format(m))
     # knot span [u_i, u_i+1) is only nonzero on N_i-p,p, N_i-p+1,p, ..., N_i,p
-    return get_basis_function_internal(icp, p) if is_function_nonzero(p, knots, icp, iks) else poly(0)
+    f = get_basis_function_internal(icp, p) if is_function_nonzero(p, knots, icp, iks) else poly(0)
+    return f if der == 0 else f.deriv(der)
+
 
 def get_basis_functions(p, knots):
     """ Returns a matrix of Polynomials that indicate how basis functions should be calculated for various knot spans,
@@ -69,5 +72,6 @@ def get_collocation_matrix(p, knots, sites):
         iks = get_knotspan_start_idx(knots, sites[r])
         out[r, :] = [fn_matrix[iks, c](sites[r]) for c in range(num_cp)]
     return out
+
 
 

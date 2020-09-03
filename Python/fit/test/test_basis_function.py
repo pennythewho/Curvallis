@@ -45,6 +45,40 @@ class TestFitBasisFunction(ut.TestCase):
         self.assertTrue(bf.get_basis_function(i, p, knots, 2).has_samecoef(poly((-5.5, 20, -16))))
         self.assertTrue(bf.get_basis_function(i, p, knots, 3).has_samecoef(poly((8, -16, 8))))
 
+    def test_get_basis_function_simple_knots_ddu(self):
+        p = 2
+        m = 4
+        knots = np.arange(m + 1) / m
+        self.assertTrue(bf.get_basis_function(0,2,knots,0,1).has_samecoef(poly((0,16))), 'Incorrect polynomial for icp=0, iks=0')
+        self.assertTrue(bf.get_basis_function(1,2,knots,0,1).has_samecoef(poly(0)), 'Incorrect polynomial for icp=1, iks=0')
+        self.assertTrue(bf.get_basis_function(0,2,knots,1,1).has_samecoef(poly((12,-32))), 'Incorrect polynomial for icp=0, iks=1')
+        self.assertTrue(bf.get_basis_function(1,2,knots,1,1).has_samecoef(poly((-4,16))), 'Incorrect polynomial for icp=1, iks=1')
+        self.assertTrue(bf.get_basis_function(0,2,knots,2,1).has_samecoef(poly((-12,16))), 'Incorrect polynomial for icp=0, iks=2')
+        self.assertTrue(bf.get_basis_function(1,2,knots,2,1).has_samecoef(poly((20,-32))), 'Incorrect polynomial for icp=1, iks=2')
+        self.assertTrue(bf.get_basis_function(0,2,knots,3,1).has_samecoef(poly(0)), 'Incorrect polynomial for icp=0, iks=3')
+        self.assertTrue(bf.get_basis_function(1,2,knots,3,1).has_samecoef(poly((-16,16))), 'Incorrect polynomial for icp=1, iks=3')
+
+    def test_get_basis_function_simple_knots_d2du2(self):
+        p = 2
+        m = 4
+        knots = np.arange(m + 1) / m
+        self.assertTrue(bf.get_basis_function(0, 2, knots, 0, 2).has_samecoef(poly(16)),
+                        'Incorrect polynomial for icp=0, iks=0')
+        self.assertTrue(bf.get_basis_function(1, 2, knots, 0, 2).has_samecoef(poly(0)),
+                        'Incorrect polynomial for icp=1, iks=0')
+        self.assertTrue(bf.get_basis_function(0, 2, knots, 1, 2).has_samecoef(poly(-32)),
+                        'Incorrect polynomial for icp=0, iks=1')
+        self.assertTrue(bf.get_basis_function(1, 2, knots, 1, 2).has_samecoef(poly(16)),
+                        'Incorrect polynomial for icp=1, iks=1')
+        self.assertTrue(bf.get_basis_function(0, 2, knots, 2, 2).has_samecoef(poly(16)),
+                        'Incorrect polynomial for icp=0, iks=2')
+        self.assertTrue(bf.get_basis_function(1, 2, knots, 2, 2).has_samecoef(poly(-32)),
+                        'Incorrect polynomial for icp=1, iks=2')
+        self.assertTrue(bf.get_basis_function(0, 2, knots, 3, 2).has_samecoef(poly(0)),
+                        'Incorrect polynomial for icp=0, iks=3')
+        self.assertTrue(bf.get_basis_function(1, 2, knots, 3, 2).has_samecoef(poly(16)),
+                        'Incorrect polynomial for icp=1, iks=3')
+
     def test_get_basis_function_multiple_knots_p2_cp0(self):
         p = 2
         knots = np.append(np.append(np.repeat(0, p+1), [.3, .5, .5, .6]), np.repeat(1, p+1))
@@ -113,6 +147,42 @@ class TestFitBasisFunction(ut.TestCase):
         nptest.assert_almost_equal(bf.get_basis_function(i, p, knots, 6).coef, poly((2.25, -7.5, 6.25)).coef, err_msg='wrong polynomial for icp=6, iks=6')
         for iks in np.append(np.arange(6), np.arange(7, m)):
             self.assertTrue(bf.get_basis_function(i, p, knots, iks).has_samecoef(poly(0)), 'wrong polynomial for icp=3, iks={0}'.format(iks))
+
+    def test_get_basis_function_multiple_knots_ddu(self):
+        p = 2
+        knots = np.append(np.append(np.repeat(0, p + 1), [.3, .5, .5, .6]), np.repeat(1, p + 1))
+        m = len(knots) - 1
+        n = m-p-1
+        d = 1
+        # [0,0.3)
+        nptest.assert_array_almost_equal(bf.get_basis_function(0,p,knots,2,d).coef, poly((-20/3,200/9)).coef, err_msg='Incorrect polynomial for icp=0, iks=2')
+        self.assertTrue(bf.get_basis_function(1,p,knots,2,d).has_samecoef(poly((20/3,-320/9))), 'Incorrect polynomial for icp=1, iks=2')
+        self.assertTrue(bf.get_basis_function(2,p,knots,2,d).has_samecoef(poly((0,40/3))), 'Incorrect polynomial for icp=2, iks=2')
+        for i in range(3,n+1):
+            self.assertTrue(bf.get_basis_function(i,p,knots,2,d).has_samecoef(poly(0)), 'Incorrect polynomial for icp={0}, iks=2')
+        # [0.3,0.5)
+        self.assertTrue(bf.get_basis_function(1,p,knots,3,d).has_samecoef(poly((-10,20))), 'Incorrect polynomial for icp=1, iks=3')
+        self.assertTrue(bf.get_basis_function(2,p,knots,3,d).has_samecoef(poly((25,-70))), 'Incorrect polynomial for icp=2, iks=3')
+        nptest.assert_array_almost_equal(bf.get_basis_function(3,p,knots,3,d).coef, poly((-15,50)).coef, err_msg='Incorrect polynomial for icp=3, iks=3')
+        for i in [0]+list(range(4,n+1)):
+            self.assertTrue(bf.get_basis_function(i,p,knots,3,d).has_samecoef(poly(0)), 'Incorrect polynomial for icp={0}, iks=3')
+        # [0.5,0.6)
+        nptest.assert_array_almost_equal(bf.get_basis_function(3,p,knots,5,d).coef, poly((-120,200)).coef, err_msg='Incorrect polynomial for icp=3, iks=5')
+        nptest.assert_array_almost_equal(bf.get_basis_function(4,p,knots,5,d).coef, poly((140,-240)).coef, err_msg='Incorrect polynomial for icp=4, iks=5')
+        nptest.assert_array_almost_equal(bf.get_basis_function(5,p,knots,5,d).coef, poly((-20,40)).coef, err_msg='Incorrect polynomial for icp=5, iks=5')
+        for i in list(range(3))+list(range(6,n+1)):
+            self.assertTrue(bf.get_basis_function(i,p,knots,5,d).has_samecoef(poly(0)), 'Incorrect polynomial for icp={0}, iks=5')
+        # [0.6,1)
+        self.assertTrue(bf.get_basis_function(4,p,knots,6,d).has_samecoef(poly((-10,10))), 'Incorrect polynomial for icp=4, iks=6')
+        self.assertTrue(bf.get_basis_function(5,p,knots,6,d).has_samecoef(poly((17.5,-22.5))), 'Incorrect polynomial for icp=5, iks=6')
+        nptest.assert_array_almost_equal(bf.get_basis_function(6,p,knots,6,d).coef, poly((-7.5,12.5)).coef, err_msg='Incorrect polynomial for icp=6, iks=6')
+        for i in range(4):
+            self.assertTrue(bf.get_basis_function(i, p, knots, 6, d).has_samecoef(poly(0)), 'Incorrect polynomial for icp={0}, iks=5')
+        # all other knot spans should be all zeros
+        for iks in [0,1,4,7,8]:
+            for icp in range(n+1):
+                self.assertTrue(bf.get_basis_function(icp,p,knots,iks,d).has_samecoef(poly(0)), 'Incorrect polynomial for icp={icp},iks={iks}')
+
 
     def test_get_basis_function_multiple_knots_p3_zerolengthspans(self):
         p = 3
