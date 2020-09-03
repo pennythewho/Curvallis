@@ -513,19 +513,19 @@ class TestFitBasisFunction(ut.TestCase):
         sites = np.linspace(0,1,numsites)
         expected = np.zeros((numsites, n+1), dtype=np.float)
         # N_0,2
-        expected[0:3,0] = [(poly((-20/3,200/9)))(s) for s in sites[0:3]]
+        expected[0:3,0] = [poly((-20/3,200/9))(s) for s in sites[0:3]]
         # N_1,2
-        expected[0:3,1] = [(20/3*poly((1,-16/3)))(s)for s in sites[0:3]]
-        expected[3:5,1] = [(2.5*poly((-4,8)))(s) for s in sites[3:5]]
+        expected[0:3,1] = [poly((20/3,-320/9))(s)for s in sites[0:3]]
+        expected[3:5,1] = [poly((-10,20))(s) for s in sites[3:5]]
         # N_2,2
         expected[0:3,2] = [poly((0,40/3))(s)for s in sites[0:3]]
         expected[3:5,2] = [poly((25,-70))(s) for s in sites[3:5]]
         # N_3,2
         expected[3:5,3] = [(poly((-15,50)))(s) for s in sites[3:5]]
-        expected[5,3] = (poly((-120,200)))(sites[5])
+        expected[5,3] = poly((-120,200))(sites[5])
         # N_4,2
-        expected[5,4] = (20*poly((7,-12)))(sites[5])
-        expected[6:,4] = [(5*poly((-2,2)))(s) for s in sites[6:]]
+        expected[5,4] = poly((140,-240))(sites[5])
+        expected[6:,4] = [poly((-10,10))(s) for s in sites[6:]]
         # N_5,2
         expected[5,5] = poly((-20,40))(sites[5])
         expected[6:,5] = [poly((17.5,-22.5))(s) for s in sites[6:]]
