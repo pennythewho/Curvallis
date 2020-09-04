@@ -2,10 +2,16 @@ import numpy as np
 
 
 def validate_knots(knots):
-    """ Ensures knots is a non-decreasing sequence """
+    """ Checks conditions required for a valid knot sequence and throws a ValueError if any are violated
+    Conditions include
+        - knots is a non-decreasing sequence
+        - there is at least one index at which knots[i+1] - knots[i] > 0
+    """
     kd = np.diff(knots)
     if any(kd < 0):
-        raise ValueError('The knot sequence is non-decreasing.')
+        raise ValueError('The knot sequence is not non-decreasing.')
+    if sum(kd) == 0:
+        raise ValueError('There must be at least one knot span with length > 0.')
     return
 
 
@@ -38,6 +44,13 @@ def get_num_ctrlpts(p, knots):
     return len(knots) - 1 - p
 
 
+def get_last_knotspan(knots):
+    """ Returns the starting index of the last nonempty knot span in the knot sequence
+    """
+    validate_knots(knots)
+    return np.max(np.nonzero(np.diff(knots)))
+
+
 def get_knotspan_start_idx(knots, u):
     """ Finds the index of the knot that begins the half-open interval in which the site can be found
 
@@ -51,10 +64,27 @@ def get_knotspan_start_idx(knots, u):
     if u < knots[0] or u > knots[-1] or knots.size < 2:
         return -1
     elif u == knots[-1]:
-        knot_span_len = np.nonzero(np.diff(knots))[0]
-        return knot_span_len[-1] if knot_span_len.size > 0 else -1
+        return get_last_knotspan(knots)
     else:
         return next((idx for idx in range(knots.size - 1) if knots[idx] <= u < knots[idx + 1]))
+
+
+def find_sites_in_span(knots, iks, sites):
+    """ Returns indices for sites that fall in the specified knot span [knots[iks], knots[iks+1])
+    For sites that equal knots[-1], the last non-empty knot span will be returned
+
+    :param knots:   The knot sequence (iterable of floats)
+    :param iks:     The index of the knot span for which sites should be found (int where 0 <= iks < len(knots)-1)
+                    Does not support negative knot indexing
+    :param sites:   The nondecreasing list of sites to search.  (iterable of floats)
+    :return:        A list of indexes for sites that fall in knot span
+    """
+    if iks < 0 or iks >= len(knots) - 1:
+        return np.empty((0,), dtype=int)
+    else:
+        lastspan = get_last_knotspan(knots)
+        # nonzero returns a tuple of arrays (each treating a different axis) so need to just get the 0th entry for 1D
+        return np.nonzero(((knots[iks] <= sites) & (sites < knots[iks+1])) | ((iks == lastspan) & (sites == knots[-1])))[0]
 
 
 def is_function_nonzero(p, knots, icp, iks):
@@ -62,6 +92,9 @@ def is_function_nonzero(p, knots, icp, iks):
     This function does not support negative indexing.
     """
     return (0 <= iks < len(knots)) and (iks in range(icp, icp+p+1)) and (knots[iks + 1] - knots[iks] > 0)
+
+
+
 
 
 

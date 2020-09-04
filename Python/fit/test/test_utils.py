@@ -1,5 +1,6 @@
 import unittest as ut
 import numpy as np
+from numpy import testing as nptest
 from .. import utils
 
 class TestFitUtils(ut.TestCase):
@@ -15,7 +16,7 @@ class TestFitUtils(ut.TestCase):
 
     def test_validate_knots_allsame(self):
         knots = np.repeat(4, 4)
-        utils.validate_knots(knots) # no error
+        self.assertRaisesRegex(ValueError, "at least one knot span with length", utils.validate_knots, knots=knots)
 
     def test_validate_knots_nondecreasing(self):
         knots = np.array([0,0,1,2,2,3,3])
@@ -23,7 +24,7 @@ class TestFitUtils(ut.TestCase):
 
     def test_validate_knots_onestepdown(self):
         knots = np.array([0,0,1,2,np.nextafter(2,1),3,3])
-        self.assertRaises(ValueError, utils.validate_knots, knots=knots)
+        self.assertRaisesRegex(ValueError, "not non-decreasing", utils.validate_knots, knots=knots)
 
     def test_get_multiplicity_simple(self):
         knots = np.arange(4)
@@ -195,6 +196,54 @@ class TestFitUtils(ut.TestCase):
         self.assertTrue(utils.is_function_nonzero(p, knots, n, n))
         for iks in range(n+1, len(knots)):
             self.assertFalse(utils.is_function_nonzero(p, knots, n, iks), 'Incorrect for iks={0}'.format(iks))
+
+    def test_get_last_knotspan_last_span_empty(self):
+        knots = [0,1,2,3,4,4]
+        self.assertEqual(3, utils.get_last_knotspan(knots))
+
+    def test_get_last_knotspan_onespan(self):
+        knots = [0,1]
+        self.assertEqual(0, utils.get_last_knotspan(knots))
+
+    def test_get_last_knotspan_invalidknotsequence(self):
+        knots = np.repeat(0,4)
+        self.assertRaises(ValueError, utils.get_last_knotspan, knots=knots)
+
+    def test_get_last_knotspan_lastspan(self):
+        knots = list(range(4))
+        # the last index will be 3, but that is the end of the knot span that begins at index 2
+        self.assertEqual(2, utils.get_last_knotspan(knots))
+
+    def test_find_sites_in_span_inlastspan(self):
+        knots = [0,0,0,.3,.5,.5,.6,1,1,1]
+        sites = np.linspace(0,1,11)
+        iks=6
+        nptest.assert_array_equal([6,7,8,9,10], utils.find_sites_in_span(knots, 6, sites))
+
+    def test_find_sites_in_span_emptyknotindex(self):
+        knots = [0, 0, 0, .3, .5, .5, .6, 1, 1, 1]
+        sites = np.linspace(0, 1, 11)
+        for iks in (np.diff(knots) == 0).nonzero()[0]:
+            self.assertEqual(0, utils.find_sites_in_span(knots, iks, sites).size)
+
+    def test_find_sites_in_span_outsideknots(self):
+        knots = [0, 0, 0, .3, .5, .5, .6, 1, 1, 1]
+        sites = np.linspace(2, 3, 11)
+        for iks in range(len(knots)):
+            self.assertEqual(0, utils.find_sites_in_span(knots, iks, sites).size)
+
+    def test_find_sites_in_span_firstknot(self):
+        knots = [0, 0, 0, .3, .5, .5, .6, 1, 1, 1]
+        sites = np.linspace(0, 1, 11)
+        self.assertEqual(0, utils.find_sites_in_span(knots, 0, sites).size)
+        self.assertEqual(0, utils.find_sites_in_span(knots, 1, sites).size)
+        nptest.assert_array_equal([0,1,2], utils.find_sites_in_span(knots, 2, sites))
+
+    def test_find_sites_in_span_sitesequaltoknots(self):
+        knots = np.arange(4)
+        nptest.assert_array_equal([0], utils.find_sites_in_span(knots, 0, knots))
+        nptest.assert_array_equal([1], utils.find_sites_in_span(knots, 1, knots))
+        nptest.assert_array_equal([2,3], utils.find_sites_in_span(knots, 2,  knots))
 
 
 
