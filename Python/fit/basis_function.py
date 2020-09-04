@@ -1,7 +1,7 @@
 from functools import partial
 import numpy as np
 from numpy.polynomial.polynomial import Polynomial as poly
-from .utils import get_num_ctrlpts, is_function_nonzero, get_knotspan_start_idx
+from .utils import get_num_ctrlpts, is_function_nonzero, find_sites_in_span
 
 
 def get_basis_function(icp, p, knots, iks, der=0):
@@ -64,15 +64,16 @@ def get_collocation_matrix(p, knots, sites, der=0):
     :param sites:   a float vector with the sites (x-values) for which basis functions should be calculated
                     (u in the B-spline discussion)
     :param der:     The derivative to take (int >= 0).  Defaults to 0
-    :return:        The len(sites) x get_num_ctrlpts(degree, knots) collocation matrix A,
+    :return:        The collocation matrix A, of shape (len(sites), get_num_ctrlpts(degree, knots))
                     where element A_{i,j} = N_{j,p}(x_i}
     """
     fn_matrix = get_basis_functions(p, knots, der)
     num_cp = fn_matrix.shape[1]
     out = np.empty((len(sites), num_cp), np.float)
-    for r in range(len(sites)):
-        iks = get_knotspan_start_idx(knots, sites[r])
-        out[r, :] = [fn_matrix[iks, c](sites[r]) for c in range(num_cp)]
+    for iks in range(fn_matrix.shape[0]):
+        si = find_sites_in_span(knots, iks, sites)
+        if si.size > 0:
+            out[si, :] = np.transpose([fn_matrix[iks, icp](sites[si]) for icp in range(num_cp)])
     return out
 
 

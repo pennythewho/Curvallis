@@ -1,4 +1,5 @@
 import unittest as ut
+import time
 import numpy as np
 import numpy.testing as nptest
 from numpy.polynomial.polynomial import Polynomial as poly
@@ -535,6 +536,24 @@ class TestFitBasisFunction(ut.TestCase):
         self.assertEqual(expected.shape, actual.shape, 'Matrix is wrong size')
         for si in range(numsites):
             nptest.assert_array_almost_equal(expected[si], actual[si], err_msg='Incorrect values for site {0}'.format(sites[si]))
+
+    @ut.skip('Performance test')
+    def test_performance_compare_to_nurbs_python(self):
+        p = 2
+        knots = np.array([0, 0, 0, 0.3, 0.5, 0.5, 0.6, 1, 1, 1])
+        m = len(knots) - 1
+        n = m - p - 1
+        numsites = int(1e6)
+        sites = np.linspace(0, 1, numsites)
+        # time to run my version of calculating a collocation matrix
+        start = time.time()
+        colmat = bf.get_collocation_matrix(p, knots, sites)
+        print("get_collocation_matrix took {0} seconds to run for {1:,} sites".format(time.time()-start, numsites))
+
+
+
+
+
 
 
 
