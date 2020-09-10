@@ -5,7 +5,7 @@ def validate_knots(knots):
     """ Checks conditions required for a valid knot sequence and throws a ValueError if any are violated
     Conditions include
         - knots is a non-decreasing sequence
-        - there is at least one index at which knots[i+1] - knots[i] > 0
+        - there is at least one index i for which knots[i+1] > knots[i]
     """
     kd = np.diff(knots)
     if any(kd < 0):

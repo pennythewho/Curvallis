@@ -3,7 +3,7 @@ import numpy as np
 from numpy import testing as nptest
 from .. import utils
 
-class TestFitUtils(ut.TestCase):
+class TestUtils(ut.TestCase):
     def setUp(self):
         self.m = 10
         self.knots = np.linspace(0, 1, self.m + 1)
