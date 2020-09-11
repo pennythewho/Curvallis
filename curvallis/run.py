@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Copyright (c) 2016, Lawrence Livermore National Security, LLC.
 # Produced at the Lawrence Livermore National Laboratory
 # Written by Paul Minner <minner.paul@gmail.com>
@@ -9,8 +9,7 @@
 # This file is part of Curvallis. 
 # For details, see https://github.com/llnl/Curvallis.
 # Please also Curvallis/LICENSE.
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 """
 Created on Fri Mar 13 15:34:13 2015
@@ -23,48 +22,60 @@ from __future__ import print_function
 
 import sys
 import math
-
 import matplotlib
-matplotlib.use('TkAgg')
-import tkinter
+from tkinter import Tk, Label, Button, Entry
 from matplotlib import pyplot, rcParams
 from matplotlib.backend_bases import NavigationToolbar2, FigureManagerBase
-from matplotlib.widgets import RectangleSelector
+from matplotlib import widgets
+from curvallis.window import key_mappings_window, fitter_info_window
 from curvallis.curve_editing import curve_fitters, io, lines, regions, configargparse
-from tkinter import Tk, Label, Button, Entry
+from curvallis import window
 from math import log10
+from curvallis.version import version as VERSION_STRING
 
-VERSION_STRING = '2020-06-02 03:13PM'
+matplotlib.use('TkAgg')
 
 # Overwrite Panning and Zooming Functions
 PAN_ENABLED = False
 ZOOM_ENABLED = False
 
 old_pan = NavigationToolbar2.pan
+
+
 def new_pan(self, *args, **kwargs):
     global PAN_ENABLED
     global ZOOM_ENABLED
     ZOOM_ENABLED = False
     PAN_ENABLED = not PAN_ENABLED
     old_pan(self, *args, **kwargs)
+
+
 NavigationToolbar2.pan = new_pan
 
 old_zoom = NavigationToolbar2.zoom
+
+
 def new_zoom(self, *args, **kwargs):
     global ZOOM_ENABLED
     global PAN_ENABLED
     PAN_ENABLED = False
     ZOOM_ENABLED = not ZOOM_ENABLED
     old_zoom(self, *args, **kwargs)
+
+
 NavigationToolbar2.zoom = new_zoom
 
 old_home = NavigationToolbar2.home
+
+
 def new_home(self, *args, **kwargs):
     self.push_current()
     old_home(self, *args, **kwargs)
     self.push_current()
+
+
 NavigationToolbar2.home = new_home
-keymap_window_open = False
+
 
 class CurveInteractor(object):
     """ Calculate a curve to fit the data, let user move points and recalculate.
@@ -127,14 +138,22 @@ class CurveInteractor(object):
             '--config_file', is_config_file=True,
             help='Configuration file path(s) [default: %s].  Command line parms '
                  'override config file parms.' %
-            parser._default_config_files, metavar='<path>')
-        parser.add_argument( '--no_config_file', 
-            help='Do not use any config file, even if a default is provided',
-            action='store_true')
+                 parser._default_config_files, metavar='<path>')
+        parser.add_argument('--no_config_file',
+                            help='Do not use any config file, even if a default is provided',
+                            action='store_true')
         # config_file default is implicitly 'config_file.ini'
+        parser.add_argument(
+            '--x_label', action='store', nargs=1,
+            default='X', help='Set name of x axis label.')
+        parser.add_argument(
+            '--y_label', action='store', nargs=1,
+            default='Y', help='Set name of y axis label.')
         io.define_args(parser)
         regions.define_args(parser)
         curve_fitters.define_args(parser)
+        window.define_args(parser)
+
         self._parser = parser
 
     # END Init support =========================================================
@@ -148,7 +167,7 @@ class CurveInteractor(object):
 
         The movable line and the curve lines are in the regions.
         """
-        rcParams["keymap.quit"] = ["ctrl+w", "cmd+w"] # Changes matplotlib's default quit keys
+        rcParams["keymap.quit"] = ["ctrl+w", "cmd+w"]  # Changes matplotlib's default quit keys
         self._process_args()
         self._io_manager = io.Manager(self._args)
         # Read the data sets outside of Regions so we can discover the x, y
@@ -163,12 +182,11 @@ class CurveInteractor(object):
             xy_limits=self._xy_limits,
             io_manager=self._io_manager)
         self._register_callbacks()
-        self._print_keymap()
         # Create rectangle selector for selecting multiple points
-        self._selector = RectangleSelector(self._ax, self.line_select_callback,
-                                           drawtype='box', useblit=True,
-                                           button=[1, 3],  # don't use middle button
-                                           spancoords='pixels')
+        self._selector = widgets.RectangleSelector(self._ax, self.line_select_callback,
+                                                   drawtype='box', useblit=True,
+                                                   button=[1, 3],  # don't use middle button
+                                                   spancoords='pixels')
         self._selector.set_active(False)
 
         # Main routine: display all figures and block until all figures have
@@ -184,10 +202,10 @@ class CurveInteractor(object):
         self._figure.tight_layout(pad=self._figure_padding)
         # Make axes ticks update and stay detailed
         self._ax.minorticks_on()
-        self._ax.set_xlabel('X')
-        self._ax.set_ylabel('Y')
-#        self._background_line = lines.Line(
-#            self._ax, lines.line_attributes['background_points'])
+        self._ax.set_xlabel(self._args.x_label[0])
+        self._ax.set_ylabel(self._args.y_label[0])
+        #        self._background_line = lines.Line(
+        #            self._ax, lines.line_attributes['background_points'])
         self._background_line = []
         self._plot_background_data()
         # Default logscale if 2d eos data
@@ -213,11 +231,13 @@ class CurveInteractor(object):
         fix_negative_scientific_notation_parms()
         self._args = self._parser.parse_args()
         io.process_args(self._parser, self._args)
+        window.process_args(self._args)
 
     def _set_xlim_ylim(self):
         """ Find the max and min x and y of the input values.
             Set the canvas plotting limits to those, plus some padding.
         """
+
         def expanded_range(lows, highs, factor):
             """ Receive: [lownum, possible args value], [highnum, possible
                 args value], factor
@@ -237,25 +257,25 @@ class CurveInteractor(object):
 
         # Set user inputted view limits
         if self._args.x_max:
-            self._xy_limits.view_x_max = float (self._args.x_max)
+            self._xy_limits.view_x_max = float(self._args.x_max)
         else:
             self._xy_limits.view_x_max = self._xy_limits.x_max
         if self._args.x_min:
-            self._xy_limits.view_x_min = float (self._args.x_min)
+            self._xy_limits.view_x_min = float(self._args.x_min)
         else:
             self._xy_limits.view_x_min = self._xy_limits.x_min
         if self._args.y_max:
-            self._xy_limits.view_y_max = float (self._args.y_max)
+            self._xy_limits.view_y_max = float(self._args.y_max)
         else:
             self._xy_limits.view_y_max = self._xy_limits.y_max
         if self._args.y_min:
-            self._xy_limits.view_y_min = float (self._args.y_min)
+            self._xy_limits.view_y_min = float(self._args.y_min)
         else:
             self._xy_limits.view_y_min = self._xy_limits.y_min
 
         # determine new fit based on view limits
-        view_limits = self._input_data_sets.get_specific_xy_limits (
-            self._xy_limits.view_x_max, self._xy_limits.view_x_min, 
+        view_limits = self._input_data_sets.get_specific_xy_limits(
+            self._xy_limits.view_x_max, self._xy_limits.view_x_min,
             self._xy_limits.view_y_max, self._xy_limits.view_y_min)
 
         self._xy_limits.view_x_max = view_limits.x_max
@@ -264,21 +284,23 @@ class CurveInteractor(object):
         self._xy_limits.view_y_min = view_limits.y_min
 
         # Transform limits to display coordinates
-        xmin_disp = self._ax.transData.transform((self._xy_limits.view_x_min,0))[0]
-        xmax_disp = self._ax.transData.transform((self._xy_limits.view_x_max,0))[0]
-        ymin_disp = self._ax.transData.transform((0,self._xy_limits.view_y_min))[1]
-        ymax_disp = self._ax.transData.transform((0,self._xy_limits.view_y_max))[1]
+        xmin_disp = self._ax.transData.transform((self._xy_limits.view_x_min, 0))[0]
+        xmax_disp = self._ax.transData.transform((self._xy_limits.view_x_max, 0))[0]
+        ymin_disp = self._ax.transData.transform((0, self._xy_limits.view_y_min))[1]
+        ymax_disp = self._ax.transData.transform((0, self._xy_limits.view_y_max))[1]
 
         # Calculate expanded range in display coordinates if the max
         # or min wasn't explicitly given by the user.
-        xmin_exp, xmax_exp = expanded_range([xmin_disp,self._args.x_min], [xmax_disp,self._args.x_max], self.RANGE_MARGIN)
-        ymin_exp, ymax_exp = expanded_range([ymin_disp,self._args.y_min], [ymax_disp,self._args.y_max], self.RANGE_MARGIN)
+        xmin_exp, xmax_exp = expanded_range([xmin_disp, self._args.x_min], [xmax_disp, self._args.x_max],
+                                            self.RANGE_MARGIN)
+        ymin_exp, ymax_exp = expanded_range([ymin_disp, self._args.y_min], [ymax_disp, self._args.y_max],
+                                            self.RANGE_MARGIN)
 
         # Convert expanded range data to data coordinates
-        xmin_data = self._ax.transData.inverted().transform((xmin_exp,0))[0]
-        xmax_data = self._ax.transData.inverted().transform((xmax_exp,0))[0]
-        ymin_data = self._ax.transData.inverted().transform((0,ymin_exp))[1]
-        ymax_data = self._ax.transData.inverted().transform((0,ymax_exp))[1]
+        xmin_data = self._ax.transData.inverted().transform((xmin_exp, 0))[0]
+        xmax_data = self._ax.transData.inverted().transform((xmax_exp, 0))[0]
+        ymin_data = self._ax.transData.inverted().transform((0, ymin_exp))[1]
+        ymax_data = self._ax.transData.inverted().transform((0, ymax_exp))[1]
 
         self._ax.set_xlim(xmin_data, xmax_data)
         self._ax.set_ylim(ymin_data, ymax_data)
@@ -301,7 +323,7 @@ class CurveInteractor(object):
         """ Event value is not used here.
         Called by plot system directly e.g. when resizing window.
         """
-        #print('Got draw callback')
+        # print('Got draw callback')
         self._background = self._canvas.copy_from_bbox(self._ax.bbox)
         self._draw()
 
@@ -373,50 +395,51 @@ class CurveInteractor(object):
 
     def key_press_callback(self, event):
         """ Whenever a key is pressed"""
-        print ('Pressed %s' % event.key) #Display name of pressed key
-        if self._quit_pending:                  #If a quit is pending
-            if event.key == 'q':                #and 'q' is pressed
-                print ('Quitting.')             #quit
+        print('Pressed %s' % event.key)  # Display name of pressed key
+        if self._quit_pending:  # If a quit is pending
+            if event.key == 'q':  # and 'q' is pressed
+                print('Quitting.')  # quit
                 exit(0)
-            else:                               #Else:
-                self._quit_pending = False      #cancel quit pending
-                print ('Quit cancelled.')
-        elif event.key == 'q':                  #If 'q' pressed
-                                                #Display pending quit
-            print ('Quit requested.  Press q again to quit, any other key to cancel.')
+            else:  # Else:
+                self._quit_pending = False  # cancel quit pending
+                print('Quit cancelled.')
+        elif event.key == 'q':  # If 'q' pressed
+            # Display pending quit
+            print('Quit requested.  Press q again to quit, any other key to cancel.')
             self._quit_pending = True
-        elif event.key == 'm':                  #If 'm' pressed
-            self._print_keymap()                #Display key mapping
-        elif event.key == 'M':
-            self._display_key_mappings()
+        elif event.key == 'f1':  # If 'F1' pressed
+            key_mappings_window.display_main_window()
+        elif event.key == 'm':  # If 'm' pressed
+            # Display fitter information window
+            fitter_info_window.display_main_window()
         elif event.inaxes:
-            if event.key == 't':              #If 't' pressed
-                                                #Toggle viewing of original line
+            if event.key == 't':  # If 't' pressed
+                # Toggle viewing of original line
                 self._regions.toggle_original_line_visibility()
                 self._canvas.draw()
-            elif event.key == 'b':              #If 'b' pressed
-                                                #Toggle points on/off
+            elif event.key == 'b':  # If 'b' pressed
+                # Toggle points on/off
                 self._regions.toggle_points()
                 self._canvas.draw()
-            elif event.key == 'w':              #If 'w' pressed
-                                                #Write the current points to a file
+            elif event.key == 'w':  # If 'w' pressed
+                # Write the current points to a file
                 self._regions.write_output_files()
-            elif event.key == 'y':              #If 'y' pressed
-                                                #Toggle the ability to move points on the x axis (and y axis?)
+            elif event.key == 'y':  # If 'y' pressed
+                # Toggle the ability to move points on the x axis (and y axis?)
                 self._regions.toggle_allow_xy_move()
-            elif event.key == 'a':              #If 'a' pressed
-                                                # Toggle adding/removing points
+            elif event.key == 'a':  # If 'a' pressed
+                # Toggle adding/removing points
                 if self._args.in_eos_file_base is not None:
                     # Don't allow for multi line data
-                    print ("Option Disabled: Not a 1d Plot")
+                    print("Option Disabled: Not a 1d Plot")
                 else:
                     self._add_points = not self._add_points
                     if self._add_points == True:
-                        print ("Add/Remove Mode Enabled")
+                        print("Add/Remove Mode Enabled")
                     else:
-                        print ("Add/Remove Mode Disabled")
-            elif event.key == 'e':              #If 'e' pressed
-                                                #Toggle moving blocks of points
+                        print("Add/Remove Mode Disabled")
+            elif event.key == 'e':  # If 'e' pressed
+                # Toggle moving blocks of points
                 if self._move_set == True:
                     self._regions.cancel_move_set()
                     self._move_set = False
@@ -428,47 +451,47 @@ class CurveInteractor(object):
                     self._find_set = not self._find_set
                     if self._find_set == True:
                         self._selector.set_active(True)
-                        print ("Block Select Enabled")
+                        print("Block Select Enabled")
                     else:
                         self._selector.set_active(False)
-                        print ("Block Select Disabled")
-            elif event.key == 'Q':              #If 'Q' pressed
-                self._get_equation()            #Get equation from user to plot
-            elif event.key == 'u':              #If 'u' pressed
-                                                #Undo the last point manipulation
+                        print("Block Select Disabled")
+            elif event.key == 'Q':  # If 'Q' pressed
+                self._get_equation()  # Get equation from user to plot
+            elif event.key == 'u':  # If 'u' pressed
+                # Undo the last point manipulation
                 self._regions.undo()
                 self._canvas.draw()
-            elif event.key == 'Z':              #If 'Z' pressed
-                if self._move_set == True:      #Run TriLocal Smoothing
-                    self._regions.smooth_data("trilocal", self._xmin, self._xmax, 
+            elif event.key == 'Z':  # If 'Z' pressed
+                if self._move_set == True:  # Run TriLocal Smoothing
+                    self._regions.smooth_data("trilocal", self._xmin, self._xmax,
                                               self._ymin, self._ymax)
                     self._canvas.draw()
                 else:
-                    print ("Select a region to smooth by pressing 'e'.")
-            elif event.key == 'X':              #If 'X' pressed
-                if self._move_set == True:      #Run Integral Smoothing
-                    self._regions.smooth_data("integral", self._xmin, self._xmax, 
+                    print("Select a region to smooth by pressing 'e'.")
+            elif event.key == 'X':  # If 'X' pressed
+                if self._move_set == True:  # Run Integral Smoothing
+                    self._regions.smooth_data("integral", self._xmin, self._xmax,
                                               self._ymin, self._ymax)
                     self._canvas.draw()
                 else:
-                    print ("Select a region to smooth by pressing 'e'.")
-            elif event.key == 'V':              #If 'V' pressed
-                if self._move_set == True:      #Run Acute Repair Smoothing
-                    self._regions.smooth_data("acute", self._xmin, self._xmax, 
+                    print("Select a region to smooth by pressing 'e'.")
+            elif event.key == 'V':  # If 'V' pressed
+                if self._move_set == True:  # Run Acute Repair Smoothing
+                    self._regions.smooth_data("acute", self._xmin, self._xmax,
                                               self._ymin, self._ymax)
                     self._canvas.draw()
                 else:
-                    print ("Select a region to smooth by pressing 'e'.")
-            elif event.key == 'k' or event.key == 'L':#If 'k' or 'L' pressed
+                    print("Select a region to smooth by pressing 'e'.")
+            elif event.key == 'k' or event.key == 'L':  # If 'k' or 'L' pressed
                 # Set graph x scale
                 if self._ax.get_xscale() == 'linear':
                     self._ax.set_xscale('log')
                 else:
-                    self._ax.set_xscale('linear')                    
+                    self._ax.set_xscale('linear')
                 self._set_xlim_ylim()
                 self._set_logscale()
                 self._canvas.draw()
-            elif event.key == 'l':                  #If 'l' pressed
+            elif event.key == 'l':  # If 'l' pressed
                 # Set graph y scale
                 if self._ax.get_yscale() == 'linear':
                     self._ax.set_yscale('log')
@@ -476,41 +499,46 @@ class CurveInteractor(object):
                     self._ax.set_yscale('linear')
                 self._set_xlim_ylim()
                 self._canvas.draw()
-            elif event.key == 'B':                  #If "B" pressed
-                if self._move_set == True:          #Run B-Spline Smoothing
+            elif event.key == 'B':  # If "B" pressed
+                if self._move_set == True:  # Run B-Spline Smoothing
                     self._regions.smooth_data("bspline", self._xmin, self._xmax, self._ymin, self._ymax)
                     self._canvas.draw()
                 else:
-                    print ("Select a region to smooth by pressing 'e'.")
-            elif event.key == 'H':
-                #Increase background point marker size
+                    print("Select a region to smooth by pressing 'e'.")
+            elif event.key == 'H':  # If "H" pressed
+                # Increase background point marker size
                 for i in range(len(self._background_line)):
                     self._background_line[i].set_marker_size(self._background_line[i].get_marker_size() * 1.25)
                 self._canvas.draw()
-            elif event.key == 'J':
-                #Decrease background point marker size
+            elif event.key == 'J':  # If "J" pressed
+                # Decrease background point marker size
                 for i in range(len(self._background_line)):
                     self._background_line[i].set_marker_size(self._background_line[i].get_marker_size() * 0.8)
                 self._canvas.draw()
-            elif event.key == 'i':
-                #Increase the margins of the pyplot figure and decrease tightness
+            elif event.key == 'i':  # If "i" pressed
+                # Increase the margins of the pyplot figure and decrease tightness
                 self._figure_padding += 0.1
                 self._figure.tight_layout(pad=self._figure_padding)
                 self._canvas.draw()
-            elif event.key == 'I':
-                #Decrease the margins of the pyplot figure and increase tightness
+            elif event.key == 'I':  # If "I" pressed
+                # Decrease the margins of the pyplot figure and increase tightness
                 self._figure_padding -= 0.1
                 if self._figure_padding < 0:
                     self._figure_padding = 0
                 self._figure.tight_layout(pad=self._figure_padding)
                 self._canvas.draw()
+            """elif event.key == 'delete':  # If "delete" pressed
+                if (self._move_set == True):
+                    print("Not implemented yet.")
+                else:
+                    print("Block selection is not enabled.")"""
 
     def xlim_changed_callback(self, event):
         """ xlim is changed by a zoom or a pan
 
         :param event: matplotlib.axes.Axes object
         """
-        #print('xlim changed.  New limit is: %.15E, %.15E' % event.get_xlim())
+        # print('xlim changed.  New limit is: %.15E, %.15E' % event.get_xlim())
         self._regions.plot_curves()
         # Plot interactive equation
         self._plot_icurves()
@@ -530,8 +558,8 @@ class CurveInteractor(object):
         self._ymin = min(y1, y2)
         self._ymax = max(y1, y2)
 
-        self._regions.attempt_get_set(self._xmin, self._xmax, self._ymin, 
-                                      self._ymax, eclick.x, eclick.y)  
+        self._regions.attempt_get_set(self._xmin, self._xmax, self._ymin,
+                                      self._ymax, eclick.x, eclick.y)
         self._canvas.draw()
 
     def _register_callbacks(self):
@@ -542,7 +570,7 @@ class CurveInteractor(object):
         self._canvas.mpl_connect('key_press_event', self.key_press_callback)
         self._canvas.mpl_connect('line_select_event', self.line_select_callback)
         self._xlim_callback_id = self._ax.callbacks.connect(
-                                'xlim_changed',         self.xlim_changed_callback)
+            'xlim_changed', self.xlim_changed_callback)
 
     # END Callbacks ============================================================
 
@@ -587,7 +615,7 @@ class CurveInteractor(object):
         if event.xdata != None and event.ydata != None:
             xdiff = event.xdata - self._last_click[0]
             ydiff = event.ydata - self._last_click[1]
-            
+
             self._xmin = self._xmin + xdiff
             self._xmax = self._xmax + xdiff
             self._ymin = self._ymin + ydiff
@@ -624,8 +652,8 @@ class CurveInteractor(object):
         """
         move set if user clicked in range
         """
-        if (self._xmin < event.xdata < self._xmax and 
-            self._ymin < event.ydata < self._ymax):
+        if (self._xmin < event.xdata < self._xmax and
+                self._ymin < event.ydata < self._ymax):
             self._last_click = [event.xdata, event.ydata]
             self._regions.begin_move_set(event)
         else:
@@ -685,18 +713,19 @@ class CurveInteractor(object):
         """
         Set up interface for plotting equations interactively
         """
+
         def plot_callback(e):
             # Button to plot equation
             if '_' in e.get():
                 # Underscores are a possible security risk
                 print("Underscores not allowed in equation.")
             elif e.get() not in self._iplot:
-                self._iplot.update({e.get():self._ax.plot([],[],'--')[0]})
+                self._iplot.update({e.get(): self._ax.plot([], [], '--')[0]})
                 # Disallow changing equation until it's been deleted
                 e.configure(state='disabled')
                 self._plot_icurves()
                 self._canvas.draw()
-                
+
         def delete_callback(e):
             # Button to delete equation
             if e.get() in self._iplot:
@@ -729,13 +758,13 @@ class CurveInteractor(object):
         l3 = Label(textbox, text="Filename: ")
         e = Entry(textbox, width=35)
         e2 = Entry(textbox, width=35)
-        b1 = Button(textbox, text="Plot", width=10, 
-                   command=lambda:plot_callback(e))
-        b2 = Button(textbox, text="Delete", width=10, 
-                   command=lambda:delete_callback(e))
+        b1 = Button(textbox, text="Plot", width=10,
+                    command=lambda: plot_callback(e))
+        b2 = Button(textbox, text="Delete", width=10,
+                    command=lambda: delete_callback(e))
         b3 = Button(textbox, text="Write", width=10,
-                    command=lambda:write_callback(e, e2))
-        textbox.protocol("WM_DELETE_WINDOW", lambda:close_callback(e))
+                    command=lambda: write_callback(e, e2))
+        textbox.protocol("WM_DELETE_WINDOW", lambda: close_callback(e))
         l.grid(columnspan=4, pady=10, padx=100)
         l2.grid(column=0, row=1)
         l3.grid(column=0, row=2)
@@ -744,7 +773,7 @@ class CurveInteractor(object):
         b1.grid(column=0, row=3, pady=10)
         b2.grid(column=1, row=3, pady=10, padx=34)
         b3.grid(column=2, row=3)
-        
+
     def _plot_icurves(self):
         """
         Plot interactive user inputted equations.
@@ -767,23 +796,23 @@ class CurveInteractor(object):
 
         x_count = int((x_last - x_first) * self._args.points_per_decade)
 
-        #If only one point is asked for, return x_first to avoid
-        #a 'division by 0' error in the for loop in the else statement
+        # If only one point is asked for, return x_first to avoid
+        # a 'division by 0' error in the for loop in the else statement
         if x_count == 1:
             if self._logscale or logarithmic:
-                x_first = pow(10,x_first)
+                x_first = pow(10, x_first)
             xdata = [x_first]
         else:
             x_range = x_last - x_first
             for i in range(x_count):
                 # Calculate each x without any cumulative errors:
-                portion = float(i) / float(x_count-1)
+                portion = float(i) / float(x_count - 1)
                 x = x_first + (portion * x_range)
-                xdata.append(pow(10,x))
+                xdata.append(pow(10, x))
 
         for eq, plot in self._iplot.items():
             # Plot every user inputted equation
-            ydata=[]
+            ydata = []
             # Make eval relatively safe by restricting namespace
             ns = vars(math).copy()
             ns['__builtins__'] = None
@@ -793,125 +822,14 @@ class CurveInteractor(object):
                 ns['x'] = x
                 ydata.append(eval(eq, ns))
             # Plot the data
-            plot.set_data([[xdata],[ydata]])
-
-    def _display_key_mappings(self):
-        """
-        Set up interface for displaying key mappings
-        """
-        global keymap_window_open
-        def on_closing():
-            global keymap_window_open
-            keymap_window_open = False
-            textbox.destroy()
-        if(keymap_window_open):
-            print("Key mapping window already open.")
-            return
-        mpl_lines = [
-            'Drag points to update line',
-            'Press t to toggle original line on and off [default: off]',
-            'Press b to toggle points on and off [default: on]',
-            'Press y to toggle xy move capability on and off',
-            'Press a to toggle adding and removing points with left and right',
-            '\t click respectively [default: off]',
-            'Press e to toggle selecting a block of points',
-            'Press i to enlarge figure margins',
-            'Press <shift> I to decrease figure margins',
-            'Press <shift> H to increase size of background markers',
-            'Press <shift> J to decrease size of background markers'
-        ]
-        cur_lines = [
-            'Press q then q again to quit',
-            'Press w to write the the current points to a file',
-            'Press u to undo the last point manipulation',
-            'Press <shift> Q to enter an equation to plot',
-            'Press <shift> Z for trilocal smoothing',
-            'Press <shift> X for integral smoothing',
-            'Press <shift> B for B-spline smoothing',
-            'Press <shift> V for acute repair smoothing'
-        ]
-        post_lines = [
-            'Make sure focus is on the plotting window and the cursor is',
-            'also in the plotting window when using these keys.',
-            '',
-            'Press "<SHIFT> M" to show these keys again',
-            '',
-            'More key mappings can be found at:',
-            'https://github.com/LLNL/Curvallis#interactive-commands'
-        ]
-        horizontal_line = "============================================="
-        def placelines(window,lines,spacing,offset_x,offset_y):
-            for i in range(len(lines)):
-                l = tkinter.Label(window, text=lines[i])
-                l.place(x=offset_x, y=offset_y + (spacing * i))
-        # Line Spacing
-        spacing = 20
-        # Window Size (width, height, x_offset, y_offset)
-        window_size = (500, ((8 + len(mpl_lines) + len(cur_lines) + len(post_lines)) * spacing), 30, 30)
-        textbox = tkinter.Tk()
-        # width x height + x_offset + y_offset:
-        textbox.geometry(str(window_size[0]) + "x" + str(window_size[1]) + "+" + str(window_size[2]) + "+" + str(window_size[3]))
-        # Disable window resizing
-        textbox.resizable(False, False)
-        textbox.protocol("WM_DELETE_WINDOW", on_closing)
-        textbox.title("Key Mappings")
-        ##### Matplotlib Keys #####
-        t1 = tkinter.Label(textbox, text=horizontal_line + "\nMatplotlib Keys:\n" + horizontal_line)
-        t1.place(x=0, y=0)
-        placelines(textbox, mpl_lines, spacing, 20, 3*spacing)
-        ##### Curvallis Keys #####
-        t2 = tkinter.Label(textbox, text=horizontal_line + "\nCurvallis Keys:\n" + horizontal_line)
-        t2.place(x=0, y=(len(mpl_lines) + 3) * spacing)
-        placelines(textbox, cur_lines, spacing, 20, (len(mpl_lines)+6)*spacing)
-        ##### Other keys/lines #####
-        t3 = tkinter.Label(textbox, text=horizontal_line)
-        t3.place(x=0, y=(len(mpl_lines)+len(cur_lines)+6)*spacing)
-        placelines(textbox, post_lines, spacing, 0, (len(mpl_lines)+len(cur_lines)+7)*spacing)
-        t4 = tkinter.Label(textbox, text=horizontal_line)
-        t4.place(x=0, y=(len(mpl_lines) + len(cur_lines) + len(post_lines) + 7) * spacing)
-        keymap_window_open = True
+            plot.set_data([[xdata], [ydata]])
 
     # END Callback support======================================================
 
-    @staticmethod
-    def _print_keymap():
-        print('===============================================================')
-        print('matplotlib keys:')
-        print('===============================================================')
-        print()
-        print('Drag points to update line') 
-        print('Press q then q again to quit')
-        print('Press t to toggle original line on and off [default: off]')
-        print('Press b to toggle points on and off [default: on]')
-        print('Press w to write the the current points to a file')
-        print('Press y to toggle xy move capability on and off')
-        print('Press a to toggle adding and removing points with left and right click [default: off]')
-        print('Press e to toggle selecting a block of points')
-        print('Press u to undo the last point manipulation')
-        print('Press i to enlarge figure margins')
-        print('Press <shift> I to decrease figure margins')
-        print('Press <shift> H to increase size of background markers')
-        print('Press <shift> J to decrease size of background markers')
-        print('Press <shift> Q to enter an equation to plot')
-        print('Press <shift> Z for trilocal smoothing')
-        print('Press <shift> X for integral smoothing')
-        print('Press <shift> B for B-spline smoothing')
-        print('Press <shift> V for acute repair smoothing')
-        print()
-        print('More key mappings can be found at:')
-        print('https://github.com/LLNL/Curvallis#interactive-commands')
-        print()
-        print('===============================================================')
-        print('Make sure focus is on the plotting window and the cursor is')
-        print('also in the plotting window when using these keys.')
-        print()
-        print('Press "m" to show these keys again')
-        print('===============================================================')
-        print()
 
 if __name__ == '__main__':
-
     CurveInteractor().run()
+
 
 def main():
     CurveInteractor().run()
