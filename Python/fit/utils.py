@@ -1,16 +1,23 @@
 import numpy as np
 
 
+def is_nondecreasing(vals):
+    """ True if the iterable vals is non-decreasing; False otherwise
+    """
+    return all(a <= b for a, b in zip(vals, vals[1:]))
+
+
 def validate_knots(knots):
     """ Checks conditions required for a valid knot sequence and throws a ValueError if any are violated
     Conditions include
         - knots is a non-decreasing sequence
         - there is at least one index i for which knots[i+1] > knots[i]
+
+    :raises ValueError:     if any condition is violated
     """
-    kd = np.diff(knots)
-    if any(kd < 0):
+    if not is_nondecreasing(knots):
         raise ValueError('The knot sequence is not non-decreasing.')
-    if sum(kd) == 0:
+    if knots[0] == knots[-1]:   # already know sequence is non-decreasing
         raise ValueError('There must be at least one knot span with length > 0.')
     return
 

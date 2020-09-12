@@ -10,19 +10,31 @@ class TestUtils(ut.TestCase):
     def tearDown(self):
         pass
 
-    def test_validate_knots_increasing(self):
-        knots = np.arange(4)
-        utils.validate_knots(knots)  # no error
+    def test_is_nondecreasing_increasing(self):
+        v = np.arange(4)
+        self.assertTrue(utils.is_nondecreasing(v))
 
-    def test_validate_knots_allsame(self):
-        knots = np.repeat(4, 4)
-        self.assertRaisesRegex(ValueError, "at least one knot span with length", utils.validate_knots, knots=knots)
+    def test_is_nondecreasing_allsame(self):
+        v = np.repeat(4, 4)
+        self.assertTrue(utils.is_nondecreasing(v))
+
+    def test_is_nondecreasing_nondecreasing(self):
+        v = np.array([0,0,1,2,2,3,3])
+        self.assertTrue(utils.is_nondecreasing(v))
+
+    def test_is_nondecreasing_onestepdown(self):
+        v = np.array([0,0,1,2,np.nextafter(2,1),3,3])
+        self.assertFalse(utils.is_nondecreasing(v))
 
     def test_validate_knots_nondecreasing(self):
         knots = np.array([0,0,1,2,2,3,3])
         utils.validate_knots(knots)
 
-    def test_validate_knots_onestepdown(self):
+    def test_validate_knots_empty_spans(self):
+        knots = np.repeat(4, 4)
+        self.assertRaisesRegex(ValueError, "at least one knot span with length", utils.validate_knots, knots=knots)
+
+    def test_validate_knots_decreasing(self):
         knots = np.array([0,0,1,2,np.nextafter(2,1),3,3])
         self.assertRaisesRegex(ValueError, "not non-decreasing", utils.validate_knots, knots=knots)
 
