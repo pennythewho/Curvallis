@@ -76,6 +76,18 @@ def get_knotspan_start_idx(knots, u):
         return next((idx for idx in range(knots.size - 1) if knots[idx] <= u < knots[idx + 1]))
 
 
+def is_in_knotspan(x, knotspan, is_last_knot=False):
+    """ x is in knotspan if knotspan[0] <= x < knotspan[1] (equality allowed if is_last_knot)
+
+    :param x:           A scalar float
+    :param knotspan:    A 2-tuple of floats representing the beginning and end of the half-open knot span
+    :param lastknot:    Indicates whether the end of the knotspan is also the lastknot in the overall knot sequence.
+                        If True, x will be considered in the knotspan if it is equal to the last knot
+    :return:            True if x is in the knotspan; False otherwise
+    """
+    return knotspan[0] <= x and (x < knotspan[1] or (is_last_knot and x == knotspan[1]))
+
+
 def find_sites_in_span(knots, iks, sites):
     """ Returns indices for sites that fall in the specified knot span [knots[iks], knots[iks+1])
     For sites that equal knots[-1], the last non-empty knot span will be returned
@@ -91,7 +103,7 @@ def find_sites_in_span(knots, iks, sites):
     else:
         lastspan = get_last_knotspan(knots)
         # nonzero returns a tuple of arrays (each treating a different axis) so need to just get the 0th entry for 1D
-        return np.nonzero(((knots[iks] <= sites) & (sites < knots[iks+1])) | ((iks == lastspan) & (sites == knots[-1])))[0]
+        return np.nonzero([is_in_knotspan(x, knots[iks:iks+2], iks == lastspan) for x in sites])[0]
 
 
 def is_function_nonzero(p, knots, icp, iks):

@@ -226,6 +226,28 @@ class TestUtils(ut.TestCase):
         # the last index will be 3, but that is the end of the knot span that begins at index 2
         self.assertEqual(2, utils.get_last_knotspan(knots))
 
+    def test_is_in_knotspan_below_span(self):
+        self.assertFalse(utils.is_in_knotspan(.1, (.2, .3), True))
+        self.assertFalse(utils.is_in_knotspan(.1, (.2, .3), False))
+
+    def test_is_in_knotspan_above_span(self):
+        self.assertFalse(utils.is_in_knotspan(.4, (.2, .3), True))
+        self.assertFalse(utils.is_in_knotspan(.4, (.2, .3), False))
+
+    def test_is_in_knotspan_equal_to_lower(self):
+        self.assertTrue(utils.is_in_knotspan(.2, (.2, .3), True))
+        self.assertTrue(utils.is_in_knotspan(.2, (.2, .3), False))
+
+    def test_is_in_knotspan_halfway(self):
+        self.assertTrue(utils.is_in_knotspan(.25, (.2, .3), True))
+        self.assertTrue(utils.is_in_knotspan(.25, (.2, .3), False))
+
+    def test_is_in_knotspan_equal_to_upper_lastknot(self):
+        self.assertTrue(utils.is_in_knotspan(.3, (.2, .3), True))
+
+    def test_is_in_knotspan_equal_to_upper_notlastknot(self):
+        self.assertFalse(utils.is_in_knotspan(.3, (.2, .3), False))
+
     def test_find_sites_in_span_inlastspan(self):
         knots = [0,0,0,.3,.5,.5,.6,1,1,1]
         sites = np.linspace(0,1,11)
