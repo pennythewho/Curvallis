@@ -76,18 +76,6 @@ class TestFit(ut.TestCase):
         x = [5, 6, 8, 10, 40, 100]
         nptest.assert_array_almost_equal([8, 58/3], fit.get_default_interior_knots(p,x))
 
-    def test_augment_knots_bad_internal_knots(self):
-        p = 2
-        x = [5, 6, 8, 10, 40]
-        iknots = [12, 11]
-        self.assertRaises(ValueError, fit.augment_knots, p=p, x=x, iknots=iknots)
-
-    def test_augment_knots_interior_includes_end(self):
-        p = 2
-        x = [5, 6, 8, 10, 40]
-        iknots = [5, 12]
-        self.assertRaisesRegex(ValueError, r'multiplicity greater than 3', fit.augment_knots, p=p, x=x, iknots=iknots)
-
     def test_augment_knots_first_last_with_correct_multiplicity(self):
         p = 2
         x = [5, 6, 8, 10, 40]
@@ -128,6 +116,28 @@ class TestFit(ut.TestCase):
         self.assertEqual(8, bsp._coefs.size)
         self.assertEqual(8, bspr._coefs.size)
         self.assertRaises(AssertionError, nptest.assert_array_almost_equal, bsp._coefs, bspr._coefs)
+
+    def test_get_spline_cubic_with_d1d2_regularization(self):
+        p = 3
+        x = [.197, 1, 3, 7, 20, 27, 39, 197]
+        y = [.5, .59, .73, 1.1, 2.1, 2.2, 1.7, 1.4]
+        min_d1_x = [.197, 27, 197]
+        min_d2_x = np.linspace(40, 197)
+        int_knots = [.5, 1, 5, 10, 30]
+        knots1 = fit.augment_knots(2, int_knots, x)
+        bsp = fit.get_spline(p, knots1, x, y)
+        bsp1r = fit.get_spline(p, knots1, x, y, minimize_d1_x=min_d1_x)
+        knots2 = fit.augment_knots(2, np.concatenate((int_knots, np.linspace(40, 195, 20))), x)
+        bsp2r = fit.get_spline(p, knots2, x, y, minimize_d1_x=min_d1_x, minimize_d2_x=min_d2_x)
+        nptest.assert_array_equal(knots2, bsp2r._knots)
+        from matplotlib import pyplot as plt
+        plt.plot(x, y, '*',label='data')
+        pltx = np.linspace(x[0],x[-1],2000)
+        plt.plot(pltx,bsp(pltx),label='fit - no regularization')
+        plt.plot(pltx,bsp1r(pltx),label='fit with d1 regularization')
+        plt.plot(pltx,bsp2r(pltx),label='fit with d1 and d2 regularization')
+        plt.legend()
+        plt.show(block=True)
 
 
 

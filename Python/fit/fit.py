@@ -59,9 +59,7 @@ def augment_knots(p, iknots, x):
     :param x:       The data sites to be fit
     :return:        The final knot sequence
     """
-    knots = np.concatenate((np.repeat(x[0], p+1), iknots, np.repeat(x[-1], p+1)))
-    validate_knots_and_data(p, knots, x)
-    return knots
+    return np.concatenate((np.repeat(x[0], p+1), iknots, np.repeat(x[-1], p+1)))
 
 
 def get_default_knots(p, x):
@@ -81,7 +79,8 @@ def get_spline(p, knots, x, y, **kwargs):
     :param knots:   Knots used to calculate the interpolating B-spline curve (iterable of floats)
     :param x:       Vector containing independent variable values for data points.  Must be same size as y
     :param y:       Vector containing dependent variable values for data points. Must be same size as x
-    :key minimize_d[1|2|...|p]_x:  A list of x values at which the specified derivative should be minimized
+    :key minimize_d[1|2|...|p]_x:  A list of x values at which the specified derivative should be
+                    minimized (equal to zero).
                     For example, for keyword minimize_d1_x, the value would be an iterable of x values where the
                     first derivative can reasonably be expected to be close to 0.
                     Will ignore any derivative greater than p, since those would all be 0 anyway
