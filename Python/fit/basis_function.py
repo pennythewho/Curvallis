@@ -67,6 +67,7 @@ def get_collocation_matrix(p, knots, sites, der=0):
     :return:        The collocation matrix A, of shape (len(sites), get_num_ctrlpts(degree, knots))
                     where element A_{i,j} = N_{j,p}(x_i}
     """
+    sites = np.asarray(sites)
     fn_matrix = get_basis_functions(p, knots, der)
     num_cp = fn_matrix.shape[1]
     out = np.empty((len(sites), num_cp), np.float)
