@@ -103,6 +103,15 @@ class TestFit(ut.TestCase):
         self.assertEqual(6, len(bsp._coefs))
         nptest.assert_array_almost_equal([1.003, 3.506, 46.006, 126.007, 243.506, 321.002], bsp._coefs, decimal=2)
 
+    def test_get_spline_quadratic_ignores_regularization_above_p(self):
+        p = 2
+        x = np.linspace(0, 10, 21)
+        y = np.poly1d([3, 2, 1])(x) + 1e-2 * random_sample(len(x))
+        knots = [0, 0, 0, 2.5, 5, 7.5, 10, 10, 10]
+        bsp = fit.get_spline(p, knots, x, y)
+        bspd = fit.get_spline(p, knots, x, y, minimize_d3_x=[5,6])
+        nptest.assert_array_equal(bsp._coefs, bspd._coefs)
+
     def test_get_spline_quadratic_with_d1_regularization(self):
         p = 2
         x = [.197, 1, 3, 7, 20, 27, 39]
@@ -130,14 +139,15 @@ class TestFit(ut.TestCase):
         knots2 = fit.augment_knots(2, np.concatenate((int_knots, np.linspace(40, 195, 20))), x)
         bsp2r = fit.get_spline(p, knots2, x, y, minimize_d1_x=min_d1_x, minimize_d2_x=min_d2_x)
         nptest.assert_array_equal(knots2, bsp2r._knots)
-        from matplotlib import pyplot as plt
-        plt.plot(x, y, '*',label='data')
-        pltx = np.linspace(x[0],x[-1],2000)
-        plt.plot(pltx,bsp(pltx),label='fit - no regularization')
-        plt.plot(pltx,bsp1r(pltx),label='fit with d1 regularization')
-        plt.plot(pltx,bsp2r(pltx),label='fit with d1 and d2 regularization')
-        plt.legend()
-        plt.show(block=True)
+        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, bsp1r._coefs, bsp2r._coefs)
+        # from matplotlib import pyplot as plt
+        # plt.plot(x, y, '*',label='data')
+        # pltx = np.linspace(x[0],x[-1],2000)
+        # plt.plot(pltx,bsp(pltx),label='fit - no regularization')
+        # plt.plot(pltx,bsp1r(pltx),label='fit with d1 regularization')
+        # plt.plot(pltx,bsp2r(pltx),label='fit with d1 and d2 regularization')
+        # plt.legend()
+        # plt.show(block=True)
 
 
 
