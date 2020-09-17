@@ -149,6 +149,36 @@ class TestFit(ut.TestCase):
         # plt.legend()
         # plt.show(block=True)
 
+    def test_gamma_fit(self):
+        dat = np.array([  # V (A3/atom)     Gamma
+            (1.970940000000000E-01, 5.000000000000000E-01),
+            (1.231926085803127E+00, 5.898830058497075E-01),
+            (2.954198293491804E+00, 7.261991900404980E-01),
+            (7.125924307671044E+00, 1.061940902954853E+00),
+            (1.970940000000000E+01, 2.100000000000000E+00),
+            (2.656260000000000E+01, 2.200000000000000E+00),
+            (3.941890000000000E+01, 1.700000000000000E+00),
+            (1.970940000000000E+02, 1.400000000000000E+00),
+            (1.970940000000000E+05, 6.670000000000000E-01),
+            (1.970940000000000E+12, 6.670000000000000E-01)
+        ], dtype=np.float)
+        x = dat[0:8, 0]
+        y = dat[0:8, 1]
+        p = 4
+        knots = fit.augment_knots(p, np.concatenate(([4, 10, 18, 29, 40], np.linspace(40,197,50))), x)
+        min_d1_x = [.197094, 25, 197.094]
+        min_d2_x = np.linspace(40, 197, 500)
+        bsp = fit.get_spline(p, knots, x, y, minimize_d1_x=min_d1_x, minimize_d2_x=min_d2_x)
+        from matplotlib import pyplot as plt
+        plt.plot(x, y, '*:', label='data')
+        pltx = np.linspace(x[0], x[-1], 2000)
+        plt.plot(pltx, bsp(pltx), label='cubic B-spline fit')
+        plt.xlabel('volume')
+        plt.ylabel('$\gamma$')
+        plt.title('Grüneisen parameter as function of volume')
+        plt.legend()
+        plt.show(block=True)
+
 
 
 
