@@ -2,13 +2,19 @@ import unittest as ut
 import numpy as np
 from numpy.random import random_sample
 from numpy import testing as nptest
-from .. import fit
+from .. import fit, basis_function as bf
 
 class TestFit(ut.TestCase):
     def setUp(self):
         pass
     def tearDown(self):
         pass
+
+    def _get_noisy(self, y, d=2):
+        """ adds random noise at decimal corresponding to order of magnitude of standard deviation of y minus d
+        e.g. if std(y) ~ .01 and d=1, random element will be on order of .001
+        """
+        return y + random_sample(len(y)) * 10 ** (np.floor(np.log10(np.std(y))) - d)
 
     def test_validate_knots_and_data_too_few_knots(self):
         p = 2
@@ -92,62 +98,131 @@ class TestFit(ut.TestCase):
         x = [5, 6, 8, 10, 40]
         nptest.assert_array_almost_equal([5, 5, 5, 5, 8, 40, 40, 40, 40], fit.get_default_knots(p, x))
 
-    def test_get_spline_quadratic_noisy_parabola_no_regularization(self):
+    def test__get_weighted_matrix_weight_1_scalar(self):
+        mat = np.array([[3, 5, 7], [2, 4, 6], [11, 13, 17]])
+        w = 1
+        nptest.assert_array_equal(mat, fit._get_weighted_matrix(w, mat))
+
+    def test__get_weighted_matrix_scalar_weight(self):
+        mat = np.array([[3, 5, 7], [2, 4, 6], [11, 13, 17]])
+        w = 3
+        expected = np.array([[9, 15, 21], [6, 12, 18], [33, 39, 51]])
+        nptest.assert_array_equal(expected, fit._get_weighted_matrix(w, mat))
+
+    def test__get_weighted_matrix_weight_1_vector(self):
+        mat = np.array([[3, 5, 7], [2, 4, 6], [11, 13, 17]])
+        w = [1, 1, 1]
+        nptest.assert_array_equal(mat, fit._get_weighted_matrix(w, mat))
+
+    def test__get_weighted_matrix_single_weight_vector(self):
+        mat = np.array([[3, 5, 7], [2, 4, 6], [11, 13, 17]])
+        w = [3, 3, 3]
+        expected = np.array([[9, 15, 21], [6, 12, 18], [33, 39, 51]])
+        nptest.assert_array_equal(expected, fit._get_weighted_matrix(w, mat))
+
+    def test__get_weighted_matrix_varied_weights(self):
+        mat = np.array([[3, 5, 7], [2, 4, 6], [11, 13, 17]])
+        w = [5, 4, 3]
+        expected = np.array([[15, 25, 35], [8, 16, 24], [33, 39, 51]])
+        nptest.assert_array_equal(expected, fit._get_weighted_matrix(w, mat))
+
+    def test__get_weighted_matrix_too_few_weights(self):
+        mat = np.array([[3, 5, 7], [2, 4, 6], [11, 13, 17]])
+        w = [5, 4]
+        self.assertRaisesRegex(ValueError, 'Wrong number of weights', fit._get_weighted_matrix, wt=w, mat=mat)
+
+    def test_get_spline_quadratic_no_weight_no_regularization_no_noise(self):
         p = 2
         x = np.linspace(0, 10, 21)
-        y = np.poly1d([3, 2, 1])(x) + 1e-2*random_sample(len(x))
-        knots = [0, 0, 0, 2.5, 5, 7.5, 10, 10, 10]
+        knots = fit.augment_knots(p, [2, 4, 6, 8], x)
+        expected_coefs = [1, 4, 1, 5, 9, 2, 6]
+        A = bf.get_collocation_matrix(p, knots, x)
+        y = A @ expected_coefs
         bsp = fit.get_spline(p, knots, x, y)
+        self.assertEqual(p, bsp._degree)
         nptest.assert_array_equal(knots, bsp._knots)
-        nptest.assert_array_equal(p, bsp._degree)
-        self.assertEqual(6, len(bsp._coefs))
-        nptest.assert_array_almost_equal([1.003, 3.506, 46.006, 126.007, 243.506, 321.002], bsp._coefs, decimal=2)
+        self.assertEqual(len(expected_coefs), bsp._coefs.size)
+        nptest.assert_array_almost_equal(expected_coefs, bsp._coefs)
 
-    def test_get_spline_quadratic_ignores_regularization_above_p(self):
-        p = 2
-        x = np.linspace(0, 10, 21)
-        y = np.poly1d([3, 2, 1])(x) + 1e-2 * random_sample(len(x))
-        knots = [0, 0, 0, 2.5, 5, 7.5, 10, 10, 10]
-        bsp = fit.get_spline(p, knots, x, y)
-        bspd = fit.get_spline(p, knots, x, y, minimize_d3_x=[5,6])
-        nptest.assert_array_equal(bsp._coefs, bspd._coefs)
-
-    def test_get_spline_quadratic_with_d1_regularization(self):
-        p = 2
-        x = [.197, 1, 3, 7, 20, 27, 39]
-        y = [.5, .59, .73, 1.1, 2.1, 2.2, 1.7]
-        min_d1_x = [.197, 27]
-        knots = fit.augment_knots(2, [.5, 1, 5, 10, 30], x)
-        bsp = fit.get_spline(p, knots, x, y)
-        bspr = fit.get_spline(p, knots, x, y, minimize_d1_x=min_d1_x)
-        nptest.assert_array_equal(knots, bsp._knots)
-        nptest.assert_array_equal(p, bsp._degree)
-        self.assertEqual(8, bsp._coefs.size)
-        self.assertEqual(8, bspr._coefs.size)
-        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, bsp._coefs, bspr._coefs)
-
-    def test_get_spline_cubic_with_d1d2_regularization(self):
+    def test_get_spline_cubic_no_weight_no_regularization_no_noise(self):
         p = 3
-        x = [.197, 1, 3, 7, 20, 27, 39, 197]
-        y = [.5, .59, .73, 1.1, 2.1, 2.2, 1.7, 1.4]
-        min_d1_x = [.197, 27, 197]
-        min_d2_x = np.linspace(40, 197)
-        int_knots = [.5, 1, 5, 10, 30]
-        knots1 = fit.augment_knots(2, int_knots, x)
-        bsp = fit.get_spline(p, knots1, x, y)
-        bsp1r = fit.get_spline(p, knots1, x, y, minimize_d1_x=min_d1_x)
-        knots2 = fit.augment_knots(2, np.concatenate((int_knots, np.linspace(40, 195, 20))), x)
-        bsp2r = fit.get_spline(p, knots2, x, y, minimize_d1_x=min_d1_x, minimize_d2_x=min_d2_x)
-        nptest.assert_array_equal(knots2, bsp2r._knots)
-        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, bsp1r._coefs, bsp2r._coefs)
-        # from matplotlib import pyplot as plt
-        # plt.plot(x, y, '*',label='data')
-        # pltx = np.linspace(x[0],x[-1],2000)
-        # plt.plot(pltx,bsp(pltx),label='fit - no regularization')
-        # plt.plot(pltx,bsp1r(pltx),label='fit with d1 regularization')
-        # plt.plot(pltx,bsp2r(pltx),label='fit with d1 and d2 regularization')
-        # plt.legend()
-        # plt.show(block=True)
+        x = np.linspace(0, 10, 21)
+        knots = fit.augment_knots(p, [2, 4, 6, 8], x)
+        expected_coefs = [1, 4, 1, 5, 9, 2, 6, 5]
+        A = bf.get_collocation_matrix(p, knots, x)
+        y = A @ expected_coefs
+        bsp = fit.get_spline(p, knots, x, y)
+        self.assertEqual(p, bsp._degree)
+        nptest.assert_array_equal(knots, bsp._knots)
+        self.assertEqual(len(expected_coefs), bsp._coefs.size)
+        nptest.assert_array_almost_equal(expected_coefs, bsp._coefs)
+
+    def test_get_spline_quadratic_no_weight_no_regularization_noisy(self):
+        p = 2
+        x = np.linspace(0, 10, 21)
+        knots = fit.augment_knots(p, [2, 4, 6, 8], x)
+        expected_coefs = [1, 4, 1, 5, 9, 2, 6]
+        A = bf.get_collocation_matrix(p, knots, x)
+        y = self._get_noisy(A @ expected_coefs)
+        bsp = fit.get_spline(p, knots, x, y)
+        nptest.assert_array_almost_equal(expected_coefs, bsp._coefs, decimal=1)
+
+    def test_get_spline_scalar_weight_no_regularization_noisy(self):
+        p = 2
+        x = np.linspace(0, 10, 21)
+        knots = fit.augment_knots(p, [2, 4, 6, 8], x)
+        expected_coefs = [1, 4, 1, 5, 9, 2, 6]
+        A = bf.get_collocation_matrix(p, knots, x)
+        y = self._get_noisy(A @ expected_coefs)
+        bsp = fit.get_spline(p, knots, x, y, w=3)
+        nptest.assert_array_almost_equal(expected_coefs, bsp._coefs, decimal=1)
+
+    def test_get_spline_no_weight_ignore_regularization_with_high_derivative(self):
+        p = 2
+        x = np.linspace(0, 10, 21)
+        knots = fit.augment_knots(p, [2, 4, 6, 8], x)
+        expected_coefs = [1, 4, 1, 5, 9, 2, 6]
+        A = bf.get_collocation_matrix(p, knots, x)
+        y = self._get_noisy(A @ expected_coefs)
+        bsp = fit.get_spline(p, knots, x, y)
+        bspir = fit.get_spline(p, knots, x, y, minimize_d3_x=np.linspace(4, 6, 21))
+        nptest.assert_array_almost_equal(expected_coefs, bsp._coefs, decimal=1)
+        nptest.assert_array_equal(bsp._coefs, bspir._coefs)
+
+    def test_get_spline_no_weight_d1_regularization(self):
+        p = 2
+        x = np.linspace(0, 10, 21)
+        knots = fit.augment_knots(p, [3, 5, 7], x)
+        p2 = np.poly1d([3, -14, 8])
+        y = self._get_noisy(p2(x), 0)
+        bsp = fit.get_spline(p, knots, x, y)
+        bspr = fit.get_spline(p, knots, x, y, minimize_d1_x=[2])  # actual root is 7/3
+        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, bsp._coefs, bspr._coefs, decimal=1)
+
+    def test_get_spline_no_weight_d2_regularization(self):
+        p = 3
+        x = np.linspace(0, 10, 21)
+        knots = fit.augment_knots(p, [3, 5, 7], x)
+        p3 = np.poly1d([3, -14, 8, 7])
+        y = self._get_noisy(p3(x), 1)  # lots of noise
+        bsp = fit.get_spline(p, knots, x, y)
+        bsp2r = fit.get_spline(p, knots, x, y, minimize_d2_x=[1.1]) # actual root is 14/9
+        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, bsp._coefs, bsp2r._coefs, decimal=1)
+
+    def test_get_spline_no_weight_d1d2_regularization(self):
+        p = 3
+        x = np.linspace(0, 10, 21)
+        knots = fit.augment_knots(p, [3, 5, 7], x)
+        p3 = np.poly1d([3, -14, 8, 7])
+        y = self._get_noisy(p3(x), 1)  # lots of noise
+        bsp = fit.get_spline(p, knots, x, y)
+        bspr = fit.get_spline(p, knots, x, y, minimize_d1_x=[2.34, 0.37], minimize_d2_x=[1.35]) # roots are for poly1d([)3.5,-14.2,9,7])
+        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, bsp._coefs, bspr._coefs, decimal=1)
+
+    def test_get_spline_
+
+
+
 
 
 

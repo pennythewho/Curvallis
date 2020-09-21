@@ -72,33 +72,52 @@ def get_default_knots(p, x):
     return augment_knots(p, get_default_interior_knots(p, x), x)
 
 
-def get_spline(p, knots, x, y, **kwargs):
+def _get_weighted_matrix(wt, mat):
+    (r, c) = mat.shape
+    wt = np.asarray(wt)
+    ws = wt.size
+    if ws == 1:
+        wt = np.repeat(wt, r)
+    elif ws != r:
+        raise ValueError('Wrong number of weights provided')
+    wt.shape = (r, 1)
+    return wt * mat
+
+
+def get_spline(p, knots, x, y, w=1, **kwargs):
     """ An interpolating spline estimating the curve described by (x,y) pairs
 
     :param p:       The degree of the B-spline curve (int)
     :param knots:   Knots used to calculate the interpolating B-spline curve (iterable of floats)
     :param x:       Vector containing independent variable values for data points.  Must be same size as y
     :param y:       Vector containing dependent variable values for data points. Must be same size as x
+    :param w:       Vector or scalar containing weights for (x,y) values.  A scalar value means all data points have
+                    the same value.  Defaults to all (x,y) data points having weight 1.
     :key minimize_d[1|2|...|p]_x:  A list of x values at which the specified derivative should be
                     minimized (equal to zero).
                     For example, for keyword minimize_d1_x, the value would be an iterable of x values where the
                     first derivative can reasonably be expected to be close to 0.
                     Will ignore any derivative greater than p, since those would all be 0 anyway
+    :key minimize_d[1|2|...|p]_w:  An optional scalar or list of weights corresponding to the values of
+                    minimize_d<deriv>_x with the same derivative.  If not provided, all weights are set to 1.
+                    Ignored if minimize_d<deriv>_x for the same derivative is not provided.
     :return:        A namedtuple containing the degree (p), knots, and coefficients for the interpolating B-spline
     """
     if len(x) != len(y):
         raise ValueError('Parameters x and y must be the same length.')
-    A = bf.get_collocation_matrix(p, knots, x)
+    A = _get_weighted_matrix(w, bf.get_collocation_matrix(p, knots, x))
     X = x
-    d = y
+    d = w*y  # correct sizes already confirmed len(x)=len(y) and len(x)=len(w) or w is scalar
     r = re.compile(r'minimize_d(\d)_x')
     for md in filter(r.match, kwargs.keys()):
         der = int(r.match(md)[1])
         if der <= p:  # ignore derivatives higher than the degree of the spline
             xx = kwargs[md]
             X = np.concatenate((X, xx))
-            A = np.vstack((A, bf.get_collocation_matrix(p, knots, xx, der)))
-            d = np.append(d, np.zeros(len(xx)))
+            dwp = 'minimize_d{0}_w'.format(der)
+            dw = 1 if dwp not in kwargs else kwargs[dwp]
+            A = np.vstack((A, _get_weighted_matrix(dw, bf.get_collocation_matrix(p, knots, xx, der))))
+            d = np.append(d, np.zeros(len(xx)))  # no need to multiply weights since all values are 0
     validate_knots_and_data(p, knots, X)
     coef, *_ = la.lstsq(A, d, rcond=None)
     return BsplineCurve(p, knots, coef)
