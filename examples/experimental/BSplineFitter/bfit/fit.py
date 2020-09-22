@@ -4,6 +4,7 @@ import numpy as np
 from numpy import linalg as la
 from . import basis_function as bf, utils
 
+re_minimize_x = re.compile(r'minimize_d(\d)_x')
 
 class BsplineCurve(object):
     def __init__(self, p, knots, coefs):
@@ -83,6 +84,22 @@ def _get_weighted_matrix(wt, mat):
     wt.shape = (r, 1)
     return wt * mat
 
+def _get_derivative_constraints(p, knots, **kwargs):
+    sites = np.empty(0, dtype=float)
+    dsize = 0
+    A = np.empty((0, len(knots) - 1 - p), dtype=float)
+    for md in filter(re_minimize_x.match, kwargs.keys()):
+        der = int(re_minimize_x.match(md)[1])
+        if 0 < der <= p:  # derivatives greater than the degree of the spline are already all 0
+            xx = kwargs[md]
+            sites = np.append(sites, xx)
+            # get weights for the minimization
+            dwp = 'minimize_d{0}_w'.format(der)
+            dw = 1 if dwp not in kwargs else kwargs[dwp]
+            A = np.vstack((A, _get_weighted_matrix(dw, bf.get_collocation_matrix(p, knots, xx, der))))
+            dsize = dsize + len(xx)  # no need to multiply weights since all values are 0
+    return sites, A, np.zeros(dsize, dtype=float)
+
 
 def get_spline(p, knots, x, y, w=1, **kwargs):
     """ An interpolating spline estimating the curve described by (x,y) pairs
@@ -108,18 +125,21 @@ def get_spline(p, knots, x, y, w=1, **kwargs):
     A = _get_weighted_matrix(w, bf.get_collocation_matrix(p, knots, x))
     X = x
     d = w*y  # correct sizes already confirmed len(x)=len(y) and len(x)=len(w) or w is scalar
-    r = re.compile(r'minimize_d(\d)_x')
-    for md in filter(r.match, kwargs.keys()):
-        der = int(r.match(md)[1])
-        if der <= p:  # ignore derivatives higher than the degree of the spline
-            xx = kwargs[md]
-            X = np.concatenate((X, xx))
-            # get weights for the minimization
-            dwp = 'minimize_d{0}_w'.format(der)
-            dw = 1 if dwp not in kwargs else kwargs[dwp]
-            A = np.vstack((A, _get_weighted_matrix(dw, bf.get_collocation_matrix(p, knots, xx, der))))
-            d = np.append(d, np.zeros(len(xx)))  # no need to multiply weights since all values are 0
+    (dx, dA, dy) = _get_derivative_constraints(p, knots, **kwargs)
+    # for md in filter(r.match, kwargs.keys()):
+    #     der = int(r.match(md)[1])
+    #     if der <= p:  # ignore derivatives higher than the degree of the spline
+    #         xx = kwargs[md]
+    #         X = np.concatenate((X, xx))
+    #         # get weights for the minimization
+    #         dwp = 'minimize_d{0}_w'.format(der)
+    #         dw = 1 if dwp not in kwargs else kwargs[dwp]
+    #         A = np.vstack((A, _get_weighted_matrix(dw, bf.get_collocation_matrix(p, knots, xx, der))))
+    #         d = np.append(d, np.zeros(len(xx)))  # no need to multiply weights since all values are 0
+    X = np.append(x, dx)
     validate_knots_and_data(p, knots, X)
+    A = np.vstack((A, dA))
+    d = np.append(w*y, dy)  # correct size of w already guaranteed by checks in _get_weighted_matrix and len(x)==len(y)
     coef, *_ = la.lstsq(A, d, rcond=None)
     return BsplineCurve(p, knots, coef)
 

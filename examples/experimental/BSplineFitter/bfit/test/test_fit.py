@@ -131,6 +131,111 @@ class TestFit(ut.TestCase):
         w = [5, 4]
         self.assertRaisesRegex(ValueError, 'Wrong number of weights', fit._get_weighted_matrix, wt=w, mat=mat)
 
+    def test__get_derivative_constraints_d1_no_weight(self):
+        p = 2
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        p2 = np.poly1d([3, -14, 8])
+        min_d1_x = p2.deriv(1).roots
+        X, A, d = fit._get_derivative_constraints(p, knots, minimize_d1_x=min_d1_x)
+        nptest.assert_array_equal(min_d1_x, X)
+        nptest.assert_array_equal(bf.get_collocation_matrix(p, knots, min_d1_x, 1), A)
+        nptest.assert_array_equal(np.zeros(len(min_d1_x)), d)
+
+    def test__get_derivative_constraints_d1_scalar_weight(self):
+        p = 2
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        p2 = np.poly1d([3, -14, 8])
+        min_d1_x = p2.deriv(1).roots
+        w = 1.5
+        X, A, d = fit._get_derivative_constraints(p, knots, minimize_d1_x=min_d1_x, minimize_d1_w=w)
+        nptest.assert_array_equal(min_d1_x, X)
+        nptest.assert_array_equal(1.5*bf.get_collocation_matrix(p, knots, min_d1_x, 1), A)
+        nptest.assert_array_equal(np.zeros(len(min_d1_x)), d)
+
+    def test__get_derivative_constraints_d1_vector_weight(self):
+        p = 3
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        p3 = np.poly1d([3, 8, 7], r=True)
+        min_d1_x = p3.deriv(1).roots
+        w = [1.5, 2.5]
+        X, A, d = fit._get_derivative_constraints(p, knots, minimize_d1_x=min_d1_x, minimize_d1_w=w)
+        nptest.assert_array_equal(min_d1_x, X)
+        colloc = bf.get_collocation_matrix(p, knots, min_d1_x, 1)
+        for r in range(A.shape[0]):
+            nptest.assert_array_equal(colloc[r,:]*w[r], A[r, :])
+        nptest.assert_array_equal(np.zeros(len(min_d1_x)), d)
+
+    def test__get_derivative_constraints_d2_no_weight(self):
+        p = 4
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        p4 = np.poly1d([3, 8, 7, 4.5], r=True)
+        min_d2_x = p4.deriv(2).roots
+        X, A, d = fit._get_derivative_constraints(p, knots, minimize_d2_x=min_d2_x)
+        nptest.assert_array_equal(min_d2_x, X)
+        nptest.assert_array_equal(bf.get_collocation_matrix(p, knots, min_d2_x, 2), A)
+        nptest.assert_array_equal(np.zeros(len(min_d2_x)), d)
+
+    def test__get_derivative_constraints_d2_scalar_weight(self):
+        p = 4
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        p4 = np.poly1d([3, 8, 7, 4.5], r=True)
+        min_d2_x = p4.deriv(2).roots
+        w = 1.5
+        X, A, d = fit._get_derivative_constraints(p, knots, minimize_d2_x=min_d2_x, minimize_d2_w=w)
+        nptest.assert_array_equal(min_d2_x, X)
+        nptest.assert_array_equal(w*bf.get_collocation_matrix(p, knots, min_d2_x, 2), A)
+        nptest.assert_array_equal(np.zeros(len(min_d2_x)), d)
+
+    def test__get_derivative_constraints_d2_vector_weight(self):
+        p = 4
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        p4 = np.poly1d([3, 8, 7, 4.5], r=True)
+        min_d2_x = p4.deriv(2).roots
+        w = [1.5, 2.5]
+        X, A, d = fit._get_derivative_constraints(p, knots, minimize_d2_x=min_d2_x, minimize_d2_w=w)
+        nptest.assert_array_equal(min_d2_x, X)
+        colloc = bf.get_collocation_matrix(p, knots, min_d2_x, 2)
+        for r in range(A.shape[0]):
+            nptest.assert_array_equal(colloc[r, :] * w[r], A[r, :])
+        nptest.assert_array_equal(np.zeros(len(min_d2_x)), d)
+
+    def test__get_derivative_constraints_d1d2_one_weighted(self):
+        p = 4
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        p4 = np.poly1d([3, 8, 7, 4.5], r=True)
+        min_d1_x = p4.deriv(1).roots
+        min_d2_x = p4.deriv(2).roots
+        w2 = [1.5, 2.5]
+        X, A, d = fit._get_derivative_constraints(p, knots, minimize_d1_x=min_d1_x, minimize_d2_x=min_d2_x, minimize_d2_w=w2)
+        nptest.assert_array_equal(np.concatenate((min_d1_x, min_d2_x)), X)
+        colloc1 = bf.get_collocation_matrix(p, knots, min_d1_x, 1)
+        colloc2 = fit._get_weighted_matrix(w2, bf.get_collocation_matrix(p, knots, min_d2_x, 2))
+        nptest.assert_array_equal(np.vstack((colloc1, colloc2)), A)
+        nptest.assert_array_equal(np.zeros(len(min_d1_x)+len(min_d2_x)), d)
+
+    def test__get_derivative_constraints_d1d2_scalar_weights(self):
+        p = 4
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        p4 = np.poly1d([3, 8, 7, 4.5], r=True)
+        min_d1_x = p4.deriv(1).roots
+        min_d2_x = p4.deriv(2).roots
+        w1 = 1.5
+        w2 = 2.5
+        X, A, d = fit._get_derivative_constraints(p, knots, minimize_d1_x=min_d1_x, minimize_d1_w=w1, minimize_d2_x=min_d2_x, minimize_d2_w=w2)
+        nptest.assert_array_equal(np.concatenate((min_d1_x, min_d2_x)), X)
+        colloc1 = w1*bf.get_collocation_matrix(p, knots, min_d1_x, 1)
+        colloc2 = w2*bf.get_collocation_matrix(p, knots, min_d2_x, 2)
+        nptest.assert_array_equal(np.vstack((colloc1, colloc2)), A)
+        nptest.assert_array_equal(np.zeros(len(min_d1_x)+len(min_d2_x)), d)
+
+    def test__get_derivative_constraints_ignore_high_derivative(self):
+        p = 2
+        knots = [0, 0, 0, 3, 5, 7, 10, 10, 10]
+        X, A, d = fit._get_derivative_constraints(p, knots, minimize_d3_x=[1,2])
+        self.assertTrue(X.size == 0)
+        self.assertTrue(A.size == 0)
+        self.assertTrue(d.size == 0)
+
     def test_get_spline_quadratic_no_weight_no_regularization_no_noise(self):
         p = 2
         x = np.linspace(0, 10, 21)
@@ -197,54 +302,9 @@ class TestFit(ut.TestCase):
         ideal_coefs = np.array([8, -13, -3, 29, 99, 168])     # fit.get_spline(p, knots, x, Y)
         noisy_coefs = np.array([7.8, -13.3, -2.7, 28.8, 98.5, 168.4])
         y = bf.get_collocation_matrix(p, knots, x) @ noisy_coefs
+        bsp = fit.get_spline(p, knots, x, y)
         bspr = fit.get_spline(p, knots, x, y, minimize_d1_x=p2.deriv(1).roots)  # noisy, with valid regularization
-        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, noisy_coefs, bspr._coefs, decimal=2)
-        # overall, coefs with regularization should be closer to ideal
-        self.assertLess(sum(abs(bspr._coefs - ideal_coefs)), sum(abs(noisy_coefs - ideal_coefs)))
-
-    def test_get_spline_no_weight_d2_regularization(self):
-        p = 3
-        x = np.linspace(0, 10, 21)
-        knots = fit.augment_knots(p, [3, 5, 7], x)
-        p3 = np.poly1d([3, -14, 8, 7])
-        Y = p3(x)
-        ideal_coefs = np.array([7., 15., -125/3, 92/3, 1177/3, 1059., 1687.])   # fit.get_spline(p, knots, x, Y)
-        noisy_coefs = np.array([6.7, 15.1, -41.8, 30.4, 392.1, 1059., 1687.1])
-        y = bf.get_collocation_matrix(p, knots, x) @ noisy_coefs
-        bspr = fit.get_spline(p, knots, x, y, minimize_d2_x=[14/9])             # actual root is 14/9
-        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, noisy_coefs, bspr._coefs, decimal=2)
-        self.assertLess(sum(abs(bspr._coefs - ideal_coefs)), sum(abs(noisy_coefs - ideal_coefs)))
-
-    def test_get_spline_no_weight_d1d2_regularization(self):
-        p = 3
-        x = np.linspace(0, 10, 21)
-        knots = fit.augment_knots(p, [3, 5, 7], x)
-        p3 = np.poly1d([3, -14, 8, 7])
-        Y = p3(x)
-        ideal_coefs = np.array([7., 15., -125 / 3, 92 / 3, 1177 / 3, 1059., 1687.])  # fit.get_spline(p, knots, x, Y)
-        noisy_coefs = np.array([6.8, 15.1, -41.8, 30.4, 392.1, 1058.9, 1687.1])
-        y = bf.get_collocation_matrix(p, knots, x) @ noisy_coefs
-        bsp1r = fit.get_spline(p, knots, x, y, minimize_d1_x=p3.deriv(1).roots)
-        bsp2r = fit.get_spline(p, knots, x, y, minimize_d1_x=p3.deriv(1).roots, minimize_d2_x=p3.deriv(2).roots)
-        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, bsp1r._coefs, bsp2r._coefs, decimal=3)
-        self.assertLess(sum(abs(bsp2r._coefs - ideal_coefs)), sum(abs(noisy_coefs - ideal_coefs)))
-        self.assertLess(sum(abs(bsp2r(x) - Y)), sum(abs(bf.get_collocation_matrix(p, knots, x)@noisy_coefs - Y)))
-
-    def test_get_spline_no_weight_scalar_weighted_d1d2_regularization(self):
-        p = 3
-        x = np.linspace(0, 10, 21)
-        knots = fit.augment_knots(p, [3, 5, 7], x)
-        p3 = np.poly1d([3, -14, 8, 7])
-        Y = p3(x)
-        ideal_coefs = np.array([7., 15., -125 / 3, 92 / 3, 1177 / 3, 1059., 1687.])  # fit.get_spline(p, knots, x, Y)
-        noisy_coefs = np.array([6.8, 15.1, -41.8, 30.4, 392.1, 1058.9, 1687.1])
-        y = bf.get_collocation_matrix(p, knots, x) @ noisy_coefs
-        bspr = fit.get_spline(p, knots, x, y, minimize_d1_x=p3.deriv(1).roots, minimize_d2_x=p3.deriv(2).roots)
-        bsprw = fit.get_spline(p, knots, x, y, minimize_d1_x=p3.deriv(1).roots, minimize_d1_w=2,
-                              minimize_d2_x=p3.deriv(2).roots, minimize_d2_w=1.5)
-        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, bsprw._coefs, bspr._coefs, decimal=2)
-        # weighting exact data in regularization should improve fit over noisy coefs
-        self.assertLess(sum(abs(bsprw(x) - Y)), sum(abs(bspr(x) - Y)))
+        self.assertRaises(AssertionError, nptest.assert_array_equal, bsp._coefs, bspr._coefs)
 
 
 
