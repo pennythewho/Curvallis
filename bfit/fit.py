@@ -114,6 +114,7 @@ def get_spline(p, knots, x, y, w=1, **kwargs):
         if der <= p:  # ignore derivatives higher than the degree of the spline
             xx = kwargs[md]
             X = np.concatenate((X, xx))
+            # get weights for the minimization
             dwp = 'minimize_d{0}_w'.format(der)
             dw = 1 if dwp not in kwargs else kwargs[dwp]
             A = np.vstack((A, _get_weighted_matrix(dw, bf.get_collocation_matrix(p, knots, xx, der))))

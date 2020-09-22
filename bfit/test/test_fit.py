@@ -11,10 +11,10 @@ class TestFit(ut.TestCase):
         pass
 
     def _get_noisy(self, y, d=2):
-        """ adds random noise at decimal corresponding to order of magnitude of standard deviation of y minus d
-        e.g. if std(y) ~ .01 and d=1, random element will be on order of .001
+        """ adds random noise at decimal corresponding to d less than the order of magnitude of std(abs(y))
+        e.g. if std(abs(y)) ~ .01 and d=1, random element will be on order of .001
         """
-        return y + random_sample(len(y)) * 10 ** (np.floor(np.log10(np.std(y))) - d)
+        return y + (random_sample(len(y)) - 0.5) * 10 ** (np.floor(np.log10(np.std(abs(y)))) - d)
 
     def test_validate_knots_and_data_too_few_knots(self):
         p = 2
@@ -194,32 +194,59 @@ class TestFit(ut.TestCase):
         x = np.linspace(0, 10, 21)
         knots = fit.augment_knots(p, [3, 5, 7], x)
         p2 = np.poly1d([3, -14, 8])
-        y = self._get_noisy(p2(x), 0)
-        bsp = fit.get_spline(p, knots, x, y)
-        bspr = fit.get_spline(p, knots, x, y, minimize_d1_x=[2])  # actual root is 7/3
-        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, bsp._coefs, bspr._coefs, decimal=1)
+        ideal_coefs = np.array([8, -13, -3, 29, 99, 168])     # fit.get_spline(p, knots, x, Y)
+        noisy_coefs = np.array([7.8, -13.3, -2.7, 28.8, 98.5, 168.4])
+        y = bf.get_collocation_matrix(p, knots, x) @ noisy_coefs
+        bspr = fit.get_spline(p, knots, x, y, minimize_d1_x=p2.deriv(1).roots)  # noisy, with valid regularization
+        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, noisy_coefs, bspr._coefs, decimal=2)
+        # overall, coefs with regularization should be closer to ideal
+        self.assertLess(sum(abs(bspr._coefs - ideal_coefs)), sum(abs(noisy_coefs - ideal_coefs)))
 
     def test_get_spline_no_weight_d2_regularization(self):
         p = 3
         x = np.linspace(0, 10, 21)
         knots = fit.augment_knots(p, [3, 5, 7], x)
         p3 = np.poly1d([3, -14, 8, 7])
-        y = self._get_noisy(p3(x), 1)  # lots of noise
-        bsp = fit.get_spline(p, knots, x, y)
-        bsp2r = fit.get_spline(p, knots, x, y, minimize_d2_x=[1.1]) # actual root is 14/9
-        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, bsp._coefs, bsp2r._coefs, decimal=1)
+        Y = p3(x)
+        ideal_coefs = np.array([7., 15., -125/3, 92/3, 1177/3, 1059., 1687.])   # fit.get_spline(p, knots, x, Y)
+        noisy_coefs = np.array([6.7, 15.1, -41.8, 30.4, 392.1, 1059., 1687.1])
+        y = bf.get_collocation_matrix(p, knots, x) @ noisy_coefs
+        bspr = fit.get_spline(p, knots, x, y, minimize_d2_x=[14/9])             # actual root is 14/9
+        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, noisy_coefs, bspr._coefs, decimal=2)
+        self.assertLess(sum(abs(bspr._coefs - ideal_coefs)), sum(abs(noisy_coefs - ideal_coefs)))
 
     def test_get_spline_no_weight_d1d2_regularization(self):
         p = 3
         x = np.linspace(0, 10, 21)
         knots = fit.augment_knots(p, [3, 5, 7], x)
         p3 = np.poly1d([3, -14, 8, 7])
-        y = self._get_noisy(p3(x), 1)  # lots of noise
-        bsp = fit.get_spline(p, knots, x, y)
-        bspr = fit.get_spline(p, knots, x, y, minimize_d1_x=[2.34, 0.37], minimize_d2_x=[1.35]) # roots are for poly1d([)3.5,-14.2,9,7])
-        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, bsp._coefs, bspr._coefs, decimal=1)
+        Y = p3(x)
+        ideal_coefs = np.array([7., 15., -125 / 3, 92 / 3, 1177 / 3, 1059., 1687.])  # fit.get_spline(p, knots, x, Y)
+        noisy_coefs = np.array([6.8, 15.1, -41.8, 30.4, 392.1, 1058.9, 1687.1])
+        y = bf.get_collocation_matrix(p, knots, x) @ noisy_coefs
+        bsp1r = fit.get_spline(p, knots, x, y, minimize_d1_x=p3.deriv(1).roots)
+        bsp2r = fit.get_spline(p, knots, x, y, minimize_d1_x=p3.deriv(1).roots, minimize_d2_x=p3.deriv(2).roots)
+        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, bsp1r._coefs, bsp2r._coefs, decimal=3)
+        self.assertLess(sum(abs(bsp2r._coefs - ideal_coefs)), sum(abs(noisy_coefs - ideal_coefs)))
+        self.assertLess(sum(abs(bsp2r(x) - Y)), sum(abs(bf.get_collocation_matrix(p, knots, x)@noisy_coefs - Y)))
 
-    def test_get_spline_
+    def test_get_spline_no_weight_scalar_weighted_d1d2_regularization(self):
+        p = 3
+        x = np.linspace(0, 10, 21)
+        knots = fit.augment_knots(p, [3, 5, 7], x)
+        p3 = np.poly1d([3, -14, 8, 7])
+        Y = p3(x)
+        ideal_coefs = np.array([7., 15., -125 / 3, 92 / 3, 1177 / 3, 1059., 1687.])  # fit.get_spline(p, knots, x, Y)
+        noisy_coefs = np.array([6.8, 15.1, -41.8, 30.4, 392.1, 1058.9, 1687.1])
+        y = bf.get_collocation_matrix(p, knots, x) @ noisy_coefs
+        bspr = fit.get_spline(p, knots, x, y, minimize_d1_x=p3.deriv(1).roots, minimize_d2_x=p3.deriv(2).roots)
+        bsprw = fit.get_spline(p, knots, x, y, minimize_d1_x=p3.deriv(1).roots, minimize_d1_w=2,
+                              minimize_d2_x=p3.deriv(2).roots, minimize_d2_w=1.5)
+        self.assertRaises(AssertionError, nptest.assert_array_almost_equal, bsprw._coefs, bspr._coefs, decimal=2)
+        # weighting exact data in regularization should improve fit over noisy coefs
+        self.assertLess(sum(abs(bsprw(x) - Y)), sum(abs(bspr(x) - Y)))
+
+
 
 
 
