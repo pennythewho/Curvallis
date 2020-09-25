@@ -4,7 +4,9 @@ import numpy as np
 from numpy import linalg as la
 from . import basis_function as bf, utils
 
-re_deriv_constraints = re.compile(r'(set|minimize)_d(\d)_x')
+set_kw = 'set'
+minimize_kw = 'minimize'
+re_deriv_constraints = re.compile(r'({0}|{1})_d(\d)_x'.format(set_kw, minimize_kw))
 
 class BsplineCurve(object):
     def __init__(self, p, knots, coefs):
@@ -96,7 +98,7 @@ def _get_derivative_constraints(p, knots, **kwargs):
         ctype = constr_desc[1]
         der = int(constr_desc[2])
         if 0 < der <= p:  # derivatives greater than the degree of the spline are already all 0
-            if ctype == 'minimize':
+            if ctype == minimize_kw:
                 xx = kwargs[dc]
                 dd = np.zeros(len(xx))
             else:
@@ -111,7 +113,7 @@ def _get_derivative_constraints(p, knots, **kwargs):
     return sites, A, d
 
 
-def get_spline(p, knots, x, y, w=1, **kwargs):
+def get_bspline_fit(p, knots, x, y, w=1, **kwargs):
     """ An interpolating spline estimating the curve described by (x,y) pairs
 
     :param p:       The degree of the B-spline curve (int)

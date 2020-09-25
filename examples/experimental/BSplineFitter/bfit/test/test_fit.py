@@ -355,103 +355,103 @@ class TestFit(ut.TestCase):
         self.assertTrue(A.size == 0)
         self.assertTrue(d.size == 0)
 
-    def test_get_spline_quadratic_no_weight_no_regularization_no_noise(self):
+    def test_get_bspline_fit_quadratic_no_weight_no_regularization_no_noise(self):
         p = 2
         x = np.linspace(0, 10, 21)
         knots = fit.augment_knots(p, [2, 4, 6, 8], x)
         expected_coefs = [1, 4, 1, 5, 9, 2, 6]
         A = bf.get_collocation_matrix(p, knots, x)
         y = A @ expected_coefs
-        bsp = fit.get_spline(p, knots, x, y)
+        bsp = fit.get_bspline_fit(p, knots, x, y)
         self.assertEqual(p, bsp._degree)
         nptest.assert_array_equal(knots, bsp._knots)
         self.assertEqual(len(expected_coefs), bsp._coefs.size)
         nptest.assert_array_almost_equal(expected_coefs, bsp._coefs)
 
-    def test_get_spline_cubic_no_weight_no_regularization_no_noise(self):
+    def test_get_bspline_fit_cubic_no_weight_no_regularization_no_noise(self):
         p = 3
         x = np.linspace(0, 10, 21)
         knots = fit.augment_knots(p, [2, 4, 6, 8], x)
         expected_coefs = [1, 4, 1, 5, 9, 2, 6, 5]
         A = bf.get_collocation_matrix(p, knots, x)
         y = A @ expected_coefs
-        bsp = fit.get_spline(p, knots, x, y)
+        bsp = fit.get_bspline_fit(p, knots, x, y)
         self.assertEqual(p, bsp._degree)
         nptest.assert_array_equal(knots, bsp._knots)
         self.assertEqual(len(expected_coefs), bsp._coefs.size)
         nptest.assert_array_almost_equal(expected_coefs, bsp._coefs)
 
-    def test_get_spline_quadratic_no_weight_no_regularization_noisy(self):
+    def test_get_bspline_fit_quadratic_no_weight_no_regularization_noisy(self):
         p = 2
         x = np.linspace(0, 10, 21)
         knots = fit.augment_knots(p, [2, 4, 6, 8], x)
         expected_coefs = [1, 4, 1, 5, 9, 2, 6]
         A = bf.get_collocation_matrix(p, knots, x)
         y = self._get_noisy(A @ expected_coefs)
-        bsp = fit.get_spline(p, knots, x, y)
+        bsp = fit.get_bspline_fit(p, knots, x, y)
         nptest.assert_array_almost_equal(expected_coefs, bsp._coefs, decimal=1)
 
-    def test_get_spline_scalar_weight_no_regularization_noisy(self):
+    def test_get_bspline_fit_scalar_weight_no_regularization_noisy(self):
         p = 2
         x = np.linspace(0, 10, 21)
         knots = fit.augment_knots(p, [2, 4, 6, 8], x)
         expected_coefs = [1, 4, 1, 5, 9, 2, 6]
         A = bf.get_collocation_matrix(p, knots, x)
         y = self._get_noisy(A @ expected_coefs)
-        bsp = fit.get_spline(p, knots, x, y, w=3)
+        bsp = fit.get_bspline_fit(p, knots, x, y, w=3)
         nptest.assert_array_almost_equal(expected_coefs, bsp._coefs, decimal=1)
 
-    def test_get_spline_no_weight_ignore_regularization_with_high_derivative(self):
+    def test_get_bspline_fit_no_weight_ignore_regularization_with_high_derivative(self):
         p = 2
         x = np.linspace(0, 10, 21)
         knots = fit.augment_knots(p, [2, 4, 6, 8], x)
         expected_coefs = [1, 4, 1, 5, 9, 2, 6]
         A = bf.get_collocation_matrix(p, knots, x)
         y = self._get_noisy(A @ expected_coefs)
-        bsp = fit.get_spline(p, knots, x, y)
-        bspir = fit.get_spline(p, knots, x, y, minimize_d3_x=np.linspace(4, 6, 21))
+        bsp = fit.get_bspline_fit(p, knots, x, y)
+        bspir = fit.get_bspline_fit(p, knots, x, y, minimize_d3_x=np.linspace(4, 6, 21))
         nptest.assert_array_almost_equal(expected_coefs, bsp._coefs, decimal=1)
         nptest.assert_array_equal(bsp._coefs, bspir._coefs)
 
-    def test_get_spline_no_weight_d1_regularization(self):
+    def test_get_bspline_fit_no_weight_d1_regularization(self):
         p = 2
         x = np.linspace(0, 10, 21)
         knots = fit.augment_knots(p, [3, 5, 7], x)
         p2 = np.poly1d([3, -14, 8])
-        ideal_coefs = np.array([8, -13, -3, 29, 99, 168])     # fit.get_spline(p, knots, x, Y)
+        ideal_coefs = np.array([8, -13, -3, 29, 99, 168])     # fit.get_bspline_fit(p, knots, x, Y)
         noisy_coefs = np.array([7.8, -13.3, -2.7, 28.8, 98.5, 168.4])
         y = bf.get_collocation_matrix(p, knots, x) @ noisy_coefs
-        bsp = fit.get_spline(p, knots, x, y)
-        bspr = fit.get_spline(p, knots, x, y, minimize_d1_x=p2.deriv(1).roots)
-        bspwr = fit.get_spline(p, knots, x, y, minimize_d1_x=p2.deriv(1).roots, minimize_d1_w=1.5)
+        bsp = fit.get_bspline_fit(p, knots, x, y)
+        bspr = fit.get_bspline_fit(p, knots, x, y, minimize_d1_x=p2.deriv(1).roots)
+        bspwr = fit.get_bspline_fit(p, knots, x, y, minimize_d1_x=p2.deriv(1).roots, minimize_d1_w=1.5)
         self.assertRaises(AssertionError, nptest.assert_array_equal, bsp._coefs, bspr._coefs)
         self.assertRaises(AssertionError, nptest.assert_array_equal, bsp._coefs, bspwr._coefs)
         self.assertRaises(AssertionError, nptest.assert_array_equal, bspr._coefs, bspwr._coefs)
 
-    def test_get_spline_set_d1_scalar_weight(self):
+    def test_get_bspline_fit_set_d1_scalar_weight(self):
         p = 2
         x = np.linspace(0, 10, 21)
         knots = fit.augment_knots(p, [3, 5, 7], x)
         p2 = np.poly1d([3, -14, 8])
-        ideal_coefs = np.array([8, -13, -3, 29, 99, 168])  # fit.get_spline(p, knots, x, Y)
+        ideal_coefs = np.array([8, -13, -3, 29, 99, 168])  # fit.get_bspline_fit(p, knots, x, Y)
         noisy_coefs = np.array([7.8, -13.3, -2.7, 28.8, 98.5, 168.4])
         y = bf.get_collocation_matrix(p, knots, x) @ noisy_coefs
         d1_x = [1, 2, 3]
         d1_y = p2.deriv(1)(d1_x)
         set_d1_x = [(x, dy) for x, dy in zip(d1_x, d1_y)]
         d1_w = 2
-        bsp = fit.get_spline(p, knots, x, y)
-        bsps = fit.get_spline(p, knots, x, y, set_d1_x=set_d1_x)
-        bspws = fit.get_spline(p, knots, x, y, set_d1_x=set_d1_x, set_d1_w=d1_w)
+        bsp = fit.get_bspline_fit(p, knots, x, y)
+        bsps = fit.get_bspline_fit(p, knots, x, y, set_d1_x=set_d1_x)
+        bspws = fit.get_bspline_fit(p, knots, x, y, set_d1_x=set_d1_x, set_d1_w=d1_w)
         self.assertRaises(AssertionError, nptest.assert_array_equal, bsp._coefs, bsps._coefs)
         self.assertRaises(AssertionError, nptest.assert_array_equal, bsp._coefs, bspws._coefs)
         self.assertRaises(AssertionError, nptest.assert_array_equal, bsps._coefs, bspws._coefs)
 
-    def test_get_spline_require_at_least_one_data_point(self):
+    def test_get_bspline_fit_require_at_least_one_data_point(self):
         p = 3
         knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
         p3 = np.poly1d([3, 4, 5], r=True)
-        self.assertRaisesRegex(ValueError, 'at least one', fit.get_spline, p=p, knots=knots, x=[], y=[], minimize_d1_x=p3.deriv(1).roots)
+        self.assertRaisesRegex(ValueError, 'at least one', fit.get_bspline_fit, p=p, knots=knots, x=[], y=[], minimize_d1_x=p3.deriv(1).roots)
 
 
 
