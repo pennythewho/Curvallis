@@ -4,7 +4,7 @@ import numpy as np
 from numpy import linalg as la
 from . import basis_function as bf, utils
 
-re_minimize_x = re.compile(r'minimize_d(\d)_x')
+re_deriv_constraints = re.compile(r'(set|minimize)_d(\d)_x')
 
 class BsplineCurve(object):
     def __init__(self, p, knots, coefs):
@@ -74,31 +74,41 @@ def get_default_knots(p, x):
 
 
 def _get_weighted_matrix(wt, mat):
-    (r, c) = mat.shape
-    wt = np.asarray(wt)
+    wt = np.asarray(wt); mat = np.asarray(mat)
+    rc = mat.shape
+    r = rc[0]
     ws = wt.size
     if ws == 1:
         wt = np.repeat(wt, r)
     elif ws != r:
         raise ValueError('Wrong number of weights provided')
-    wt.shape = (r, 1)
+    if len(rc) > 1:  # reshape to a column matrix if mat is not a vector
+        wt.shape = (r, 1)
     return wt * mat
+
 
 def _get_derivative_constraints(p, knots, **kwargs):
     sites = np.empty(0, dtype=float)
-    dsize = 0
+    d = np.empty(0, dtype=float)
     A = np.empty((0, len(knots) - 1 - p), dtype=float)
-    for md in filter(re_minimize_x.match, kwargs.keys()):
-        der = int(re_minimize_x.match(md)[1])
+    for dc in filter(re_deriv_constraints.match, kwargs.keys()):
+        constr_desc = re_deriv_constraints.match(dc)
+        ctype = constr_desc[1]
+        der = int(constr_desc[2])
         if 0 < der <= p:  # derivatives greater than the degree of the spline are already all 0
-            xx = kwargs[md]
-            sites = np.append(sites, xx)
-            # get weights for the minimization
-            dwp = 'minimize_d{0}_w'.format(der)
+            if ctype == 'minimize':
+                xx = kwargs[dc]
+                dd = np.zeros(len(xx))
+            else:
+                constr = np.array(kwargs[dc])
+                xx = constr[:, 0]
+                dd = constr[:, 1]
+            dwp = '{ctype}_d{der}_w'.format(**locals())
             dw = 1 if dwp not in kwargs else kwargs[dwp]
+            sites = np.append(sites, xx)
             A = np.vstack((A, _get_weighted_matrix(dw, bf.get_collocation_matrix(p, knots, xx, der))))
-            dsize = dsize + len(xx)  # no need to multiply weights since all values are 0
-    return sites, A, np.zeros(dsize, dtype=float)
+            d = np.append(d, _get_weighted_matrix(dw, dd))
+    return sites, A, d
 
 
 def get_spline(p, knots, x, y, w=1, **kwargs):
@@ -111,13 +121,18 @@ def get_spline(p, knots, x, y, w=1, **kwargs):
     :param w:       Vector or scalar containing weights for (x,y) values.  A scalar value means all data points have
                     the same value.  Defaults to all (x,y) data points having weight 1.
     :key minimize_d[1|2|...|p]_x:  A list of x values at which the specified derivative should be
-                    minimized (equal to zero).
-                    For example, for keyword minimize_d1_x, the value would be an iterable of x values where the
-                    first derivative can reasonably be expected to be close to 0.
+                    minimized (equal to zero). For example, for keyword minimize_d1_x, the value would be an iterable
+                    of x values where the first derivative can reasonably be expected to be close to 0.
                     Will ignore any derivative greater than p, since those would all be 0 anyway
     :key minimize_d[1|2|...|p]_w:  An optional scalar or list of weights corresponding to the values of
                     minimize_d<deriv>_x with the same derivative.  If not provided, all weights are set to 1.
                     Ignored if minimize_d<deriv>_x for the same derivative is not provided.
+    :key set_d[1|2|...|p]_x: A list of tuples (x, dx) tuples where the value of the specified derivative at x is equal
+                    to dx. For example, for keyword set_d2_x, a tuple (x, dx) means the second derivative at x should
+                    be equal to dx.  Ignores any derivative greater than p, since those will be equal to 0.
+    :key set_d[1|2|...|p]_w: An optional scalar or list of weights corresponding to the tuples of set_d<deriv>_xdx.
+                    If not provided, all weights are set to 1.  Ignored if set_d<deriv>_xdx for the same derivative is
+                    not provided.
     :return:        A namedtuple containing the degree (p), knots, and coefficients for the interpolating B-spline
     """
     if len(x) != len(y):

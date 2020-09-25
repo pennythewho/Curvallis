@@ -131,7 +131,17 @@ class TestFit(ut.TestCase):
         w = [5, 4]
         self.assertRaisesRegex(ValueError, 'Wrong number of weights', fit._get_weighted_matrix, wt=w, mat=mat)
 
-    def test__get_derivative_constraints_d1_no_weight(self):
+    def test__get_weighted_matrix_vector_scalar_weight(self):
+        mat = np.arange(5)
+        w = 2
+        nptest.assert_array_equal(2*mat, fit._get_weighted_matrix(w, mat))
+
+    def test__get_weighted_matrix_vector_vector_weight(self):
+        mat = [1, 2, 3]
+        w = [2, 3, 4]
+        nptest.assert_array_equal([2, 6, 12], fit._get_weighted_matrix(w, mat))
+
+    def test__get_derivative_constraints_minimize_d1_no_weight(self):
         p = 2
         knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
         p2 = np.poly1d([3, -14, 8])
@@ -141,7 +151,7 @@ class TestFit(ut.TestCase):
         nptest.assert_array_equal(bf.get_collocation_matrix(p, knots, min_d1_x, 1), A)
         nptest.assert_array_equal(np.zeros(len(min_d1_x)), d)
 
-    def test__get_derivative_constraints_d1_scalar_weight(self):
+    def test__get_derivative_constraints_minimize_d1_scalar_weight(self):
         p = 2
         knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
         p2 = np.poly1d([3, -14, 8])
@@ -152,7 +162,7 @@ class TestFit(ut.TestCase):
         nptest.assert_array_equal(1.5*bf.get_collocation_matrix(p, knots, min_d1_x, 1), A)
         nptest.assert_array_equal(np.zeros(len(min_d1_x)), d)
 
-    def test__get_derivative_constraints_d1_vector_weight(self):
+    def test__get_derivative_constraints_minimize_d1_vector_weight(self):
         p = 3
         knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
         p3 = np.poly1d([3, 8, 7], r=True)
@@ -165,7 +175,7 @@ class TestFit(ut.TestCase):
             nptest.assert_array_equal(colloc[r,:]*w[r], A[r, :])
         nptest.assert_array_equal(np.zeros(len(min_d1_x)), d)
 
-    def test__get_derivative_constraints_d2_no_weight(self):
+    def test__get_derivative_constraints_minimize_d2_no_weight(self):
         p = 4
         knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
         p4 = np.poly1d([3, 8, 7, 4.5], r=True)
@@ -175,7 +185,7 @@ class TestFit(ut.TestCase):
         nptest.assert_array_equal(bf.get_collocation_matrix(p, knots, min_d2_x, 2), A)
         nptest.assert_array_equal(np.zeros(len(min_d2_x)), d)
 
-    def test__get_derivative_constraints_d2_scalar_weight(self):
+    def test__get_derivative_constraints_minimize_d2_scalar_weight(self):
         p = 4
         knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
         p4 = np.poly1d([3, 8, 7, 4.5], r=True)
@@ -186,7 +196,7 @@ class TestFit(ut.TestCase):
         nptest.assert_array_equal(w*bf.get_collocation_matrix(p, knots, min_d2_x, 2), A)
         nptest.assert_array_equal(np.zeros(len(min_d2_x)), d)
 
-    def test__get_derivative_constraints_d2_vector_weight(self):
+    def test__get_derivative_constraints_minimize_d2_vector_weight(self):
         p = 4
         knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
         p4 = np.poly1d([3, 8, 7, 4.5], r=True)
@@ -199,7 +209,7 @@ class TestFit(ut.TestCase):
             nptest.assert_array_equal(colloc[r, :] * w[r], A[r, :])
         nptest.assert_array_equal(np.zeros(len(min_d2_x)), d)
 
-    def test__get_derivative_constraints_d1d2_one_weighted(self):
+    def test__get_derivative_constraints_minimize_d1d2_one_weighted(self):
         p = 4
         knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
         p4 = np.poly1d([3, 8, 7, 4.5], r=True)
@@ -213,7 +223,7 @@ class TestFit(ut.TestCase):
         nptest.assert_array_equal(np.vstack((colloc1, colloc2)), A)
         nptest.assert_array_equal(np.zeros(len(min_d1_x)+len(min_d2_x)), d)
 
-    def test__get_derivative_constraints_d1d2_scalar_weights(self):
+    def test__get_derivative_constraints_minimize_d1d2_scalar_weights(self):
         p = 4
         knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
         p4 = np.poly1d([3, 8, 7, 4.5], r=True)
@@ -228,10 +238,119 @@ class TestFit(ut.TestCase):
         nptest.assert_array_equal(np.vstack((colloc1, colloc2)), A)
         nptest.assert_array_equal(np.zeros(len(min_d1_x)+len(min_d2_x)), d)
 
-    def test__get_derivative_constraints_ignore_high_derivative(self):
+    def test__get_derivative_constraints_ignore_minimize_high_derivative(self):
         p = 2
         knots = [0, 0, 0, 3, 5, 7, 10, 10, 10]
         X, A, d = fit._get_derivative_constraints(p, knots, minimize_d3_x=[1,2])
+        self.assertTrue(X.size == 0)
+        self.assertTrue(A.size == 0)
+        self.assertTrue(d.size == 0)
+
+    def test__get_derivative_constraints_ignore_weight_if_minimize_missing(self):
+        p = 4
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        p4 = np.poly1d([3, 8, 7, 4.5], r=True)
+        min_d2_x = p4.deriv(2).roots
+        w2 = 2.5
+        X, A, d = fit._get_derivative_constraints(p, knots, minimize_d1_w=1.5, minimize_d2_x=min_d2_x, minimize_d2_w=w2)
+        nptest.assert_array_equal(min_d2_x, X)
+        nptest.assert_array_equal(w2 * bf.get_collocation_matrix(p, knots, min_d2_x, 2), A)
+        nptest.assert_array_equal(np.zeros(len(min_d2_x)), d)
+
+    def test__get_derivative_constraints_minimize_d2_ignore_set_weight(self):
+        p = 4
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        p4 = np.poly1d([3, 8, 7, 4.5], r=True)
+        min_d2_x = p4.deriv(2).roots
+        X, A, d = fit._get_derivative_constraints(p, knots, minimize_d2_x=min_d2_x, set_d2_w=2)
+        nptest.assert_array_equal(min_d2_x, X)
+        nptest.assert_array_equal(bf.get_collocation_matrix(p, knots, min_d2_x, 2), A)
+        nptest.assert_array_equal(np.zeros(len(min_d2_x)), d)
+
+    def test__get_derivative_constraints_set_d1_unweighted(self):
+        p = 4
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        p4 = np.poly1d([3, 8, 7, 4.5], r=True)
+        x = [1,2,3]
+        dy = p4.deriv(1)(x)
+        set_d1_x = [(a,b) for a,b in zip(x, dy)]
+        X, A, d = fit._get_derivative_constraints(p, knots, set_d1_x=set_d1_x)
+        nptest.assert_array_equal(x, X)
+        nptest.assert_array_equal(bf.get_collocation_matrix(p, knots, x, 1), A)
+        nptest.assert_array_equal(dy, d)
+
+    def test__get_derivative_constraints_set_d1_scalar_weight(self):
+        p = 4
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        p4 = np.poly1d([3, 8, 7, 4.5], r=True)
+        x = [1, 2, 3]
+        dy = p4.deriv(1)(x)
+        set_d1_x = [(a, b) for a, b in zip(x, dy)]
+        w = 2
+        X, A, d = fit._get_derivative_constraints(p, knots, set_d1_x=set_d1_x, set_d1_w=w)
+        nptest.assert_array_equal(x, X)
+        nptest.assert_array_equal(w*bf.get_collocation_matrix(p, knots, x, 1), A)
+        nptest.assert_array_equal(w*dy, d)
+
+    def test__get_derivative_constraints_set_d1_vector_weight(self):
+        p = 3
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        p3 = np.poly1d([3, 8, 7], r=True)
+        d1_x = [1, 2]
+        d1_y = p3.deriv(1)(d1_x)
+        set_d1_x = [(x, dy) for x, dy in zip(d1_x, d1_y)]
+        w = [1.5, 2.5]
+        X, A, d = fit._get_derivative_constraints(p, knots, set_d1_x=set_d1_x, set_d1_w=w)
+        nptest.assert_array_equal(d1_x, X)
+        colloc = bf.get_collocation_matrix(p, knots, d1_x, 1)
+        for r in range(A.shape[0]):
+            nptest.assert_array_equal(colloc[r, :] * w[r], A[r, :])
+            self.assertEqual(d1_y[r]*w[r], d[r])
+
+    def test__get_derivative_constraints_set_d2_ignore_minimize_weight(self):
+        p = 3
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        p3 = np.poly1d([3, 8, 7], r=True)
+        d2_x = [1, 2]
+        d2_y = p3.deriv(2)(d2_x)
+        set_d2_x = [(x,dy) for x, dy in zip(d2_x, d2_y)]
+        X, A, d = fit._get_derivative_constraints(p, knots, set_d2_x=set_d2_x, minimize_d2_w=2)
+        nptest.assert_array_equal(d2_x, X)
+        nptest.assert_array_equal(bf.get_collocation_matrix(p, knots, d2_x, 2), A)
+        nptest.assert_array_equal(d2_y, d)
+
+    def test__get_derivative_constraints_set_ignore_high_derivative(self):
+        p = 3
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        X, A, d = fit._get_derivative_constraints(p, knots, set_d4_x=[(1,2),(3,4)])
+        self.assertTrue(X.size == 0)
+        self.assertTrue(A.size == 0)
+        self.assertTrue(d.size == 0)
+
+    def test__get_derivative_constraints_ignore_weight_if_set_missing(self):
+        p = 3
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        X, A, d = fit._get_derivative_constraints(p, knots, set_d1_w=[2, 3])
+        self.assertTrue(X.size == 0)
+        self.assertTrue(A.size == 0)
+        self.assertTrue(d.size == 0)
+
+    def test__get_derivative_constraints_set_d1_ignore_minimize_weight(self):
+        p = 4
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        p4 = np.poly1d([3, 8, 7, 4.5], r=True)
+        x = [1, 2, 3]
+        dy = p4.deriv(1)(x)
+        set_d1_x = [(a, b) for a, b in zip(x, dy)]
+        X, A, d = fit._get_derivative_constraints(p, knots, set_d1_x=set_d1_x, minimize_d1_w=2)
+        nptest.assert_array_equal(x, X)
+        nptest.assert_array_equal(bf.get_collocation_matrix(p, knots, x, 1), A)
+        nptest.assert_array_equal(dy, d)
+
+    def test__get_derivative_constraints_ignore_set_high_derivative(self):
+        p = 2
+        knots = [0, 0, 0, 3, 5, 7, 10, 10, 10]
+        X, A, d = fit._get_derivative_constraints(p, knots, set_d3_x=[1, 2])
         self.assertTrue(X.size == 0)
         self.assertTrue(A.size == 0)
         self.assertTrue(d.size == 0)
@@ -303,8 +422,32 @@ class TestFit(ut.TestCase):
         noisy_coefs = np.array([7.8, -13.3, -2.7, 28.8, 98.5, 168.4])
         y = bf.get_collocation_matrix(p, knots, x) @ noisy_coefs
         bsp = fit.get_spline(p, knots, x, y)
-        bspr = fit.get_spline(p, knots, x, y, minimize_d1_x=p2.deriv(1).roots)  # noisy, with valid regularization
+        bspr = fit.get_spline(p, knots, x, y, minimize_d1_x=p2.deriv(1).roots)
+        bspwr = fit.get_spline(p, knots, x, y, minimize_d1_x=p2.deriv(1).roots, minimize_d1_w=1.5)
         self.assertRaises(AssertionError, nptest.assert_array_equal, bsp._coefs, bspr._coefs)
+        self.assertRaises(AssertionError, nptest.assert_array_equal, bsp._coefs, bspwr._coefs)
+        self.assertRaises(AssertionError, nptest.assert_array_equal, bspr._coefs, bspwr._coefs)
+
+    def test_get_spline_set_d1_scalar_weight(self):
+        p = 2
+        x = np.linspace(0, 10, 21)
+        knots = fit.augment_knots(p, [3, 5, 7], x)
+        p2 = np.poly1d([3, -14, 8])
+        ideal_coefs = np.array([8, -13, -3, 29, 99, 168])  # fit.get_spline(p, knots, x, Y)
+        noisy_coefs = np.array([7.8, -13.3, -2.7, 28.8, 98.5, 168.4])
+        y = bf.get_collocation_matrix(p, knots, x) @ noisy_coefs
+        d1_x = [1,2,3]
+        d1_y = p2.deriv(1)(d1_x)
+        set_d1_x = [(x,dy) for x, dy in zip(d1_x, d1_y)]
+        d1_w = 2
+        bsp = fit.get_spline(p, knots, x, y)
+        bsps = fit.get_spline(p, knots, x, y, set_d1_x=set_d1_x)
+        bspws = fit.get_spline(p, knots, x, y, set_d1_x=set_d1_x, set_d1_w=d1_w)
+        self.assertRaises(AssertionError, nptest.assert_array_equal, bsp._coefs, bsps._coefs)
+        self.assertRaises(AssertionError, nptest.assert_array_equal, bsp._coefs, bspws._coefs)
+        self.assertRaises(AssertionError, nptest.assert_array_equal, bsps._coefs, bspws._coefs)
+
+
 
 
 
