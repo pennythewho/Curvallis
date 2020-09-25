@@ -135,11 +135,11 @@ def get_spline(p, knots, x, y, w=1, **kwargs):
                     not provided.
     :return:        A namedtuple containing the degree (p), knots, and coefficients for the interpolating B-spline
     """
-    if len(x) != len(y):
-        raise ValueError('Parameters x and y must be the same length.')
+    if len(x) == 0 or len(x) != len(y):
+        raise ValueError('Parameters x and y must be the same length, and there must be at least one data point.')
     A = _get_weighted_matrix(w, bf.get_collocation_matrix(p, knots, x))
     X = x
-    d = w*y  # correct sizes already confirmed len(x)=len(y) and len(x)=len(w) or w is scalar
+    d = w*y  # already confirmed len(x)=len(y) and _get_weighted_matrix ensures len(x)=len(w) or w is scalar
     (dx, dA, dy) = _get_derivative_constraints(p, knots, **kwargs)
     # for md in filter(r.match, kwargs.keys()):
     #     der = int(r.match(md)[1])

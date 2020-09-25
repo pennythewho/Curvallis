@@ -436,9 +436,9 @@ class TestFit(ut.TestCase):
         ideal_coefs = np.array([8, -13, -3, 29, 99, 168])  # fit.get_spline(p, knots, x, Y)
         noisy_coefs = np.array([7.8, -13.3, -2.7, 28.8, 98.5, 168.4])
         y = bf.get_collocation_matrix(p, knots, x) @ noisy_coefs
-        d1_x = [1,2,3]
+        d1_x = [1, 2, 3]
         d1_y = p2.deriv(1)(d1_x)
-        set_d1_x = [(x,dy) for x, dy in zip(d1_x, d1_y)]
+        set_d1_x = [(x, dy) for x, dy in zip(d1_x, d1_y)]
         d1_w = 2
         bsp = fit.get_spline(p, knots, x, y)
         bsps = fit.get_spline(p, knots, x, y, set_d1_x=set_d1_x)
@@ -446,6 +446,13 @@ class TestFit(ut.TestCase):
         self.assertRaises(AssertionError, nptest.assert_array_equal, bsp._coefs, bsps._coefs)
         self.assertRaises(AssertionError, nptest.assert_array_equal, bsp._coefs, bspws._coefs)
         self.assertRaises(AssertionError, nptest.assert_array_equal, bsps._coefs, bspws._coefs)
+
+    def test_get_spline_require_at_least_one_data_point(self):
+        p = 3
+        knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
+        p3 = np.poly1d([3, 4, 5], r=True)
+        self.assertRaisesRegex(ValueError, 'at least one', fit.get_spline, p=p, knots=knots, x=[], y=[], minimize_d1_x=p3.deriv(1).roots)
+
 
 
 
