@@ -6,7 +6,7 @@ from . import basis_function as bf, utils
 
 set_kw = 'set'
 minimize_kw = 'minimize'
-re_deriv_constraints = re.compile(r'({0}|{1})_d(\d)_x'.format(set_kw, minimize_kw))
+re_deriv_constraints = re.compile(r'({0}|{1})_d(\d+)_x'.format(set_kw, minimize_kw))
 
 class BsplineCurve(object):
     def __init__(self, p, knots, coefs):

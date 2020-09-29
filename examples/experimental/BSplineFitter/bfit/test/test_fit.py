@@ -355,6 +355,16 @@ class TestFit(ut.TestCase):
         self.assertTrue(A.size == 0)
         self.assertTrue(d.size == 0)
 
+    def test__get_derivative_constraints_minimize_multidigit_deriv(self):
+        p = 12
+        knots = [0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 10, 10, 10]
+        p12 = np.poly1d(range(12), r=True)
+        dx = p12.deriv(10).roots
+        X, A, d = fit._get_derivative_constraints(p, knots, minimize_d10_x=dx)
+        nptest.assert_array_equal(dx, X)
+        nptest.assert_array_equal(bf.get_collocation_matrix(p, knots, dx, 10), A)
+        nptest.assert_array_equal(np.zeros(len(dx)), d)
+
     def test_get_bspline_fit_quadratic_no_weight_no_regularization_no_noise(self):
         p = 2
         x = np.linspace(0, 10, 21)
