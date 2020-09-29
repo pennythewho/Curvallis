@@ -1,4 +1,4 @@
-import csv
+import csv, re
 from collections import namedtuple
 import numpy as np
 from bfit import fit
@@ -6,8 +6,10 @@ from bfit import fit
 xcol = 'x'
 ycol = 'y'
 wcol = 'w'
+dsig = 'd'
 dy_template = 'd{0}y'
 dyw_template = 'd{0}w'
+dre = re.compile(r'd(\d+)({0}|{1})'.format(ycol, wcol))
 
 def load_data(path, p, with_weights=[]):
     """  Loads and parses data from a specified file and returns parameters suitable for calls to bfit.fit.get_bspline_fit
@@ -58,8 +60,8 @@ def _get_expected_cols(p, with_weights):
     return cols
 
 
-def _get_kw(src_col, is_pt=True):
-    return '_'.join([fit.set_kw, src_col[0:2], (xcol if is_pt else wcol)])
+def _get_kw(deriv, is_weight=False):
+    return '_'.join([fit.set_kw, dsig+deriv, wcol if is_weight else xcol])
 
 
 def _initialize_output(cols):
@@ -69,33 +71,40 @@ def _initialize_output(cols):
     for c in cols:
         if c[0] in [xcol, ycol, wcol]:
             out[c] = _get_empty_fvect()
-        elif c[-1] == ycol:
-            out[_get_kw(c)] = np.empty((0, 2), dtype=float)
-        elif c[-1] == wcol:
-            out[_get_kw(c, False)] = _get_empty_fvect()
+        elif c[0] == dsig:
+            cm = dre.match(c)
+            is_weight = cm[2] == wcol
+            out[_get_kw(cm[1], is_weight)] = _get_empty_fvect() if is_weight else np.empty((0, 2), dtype=float)
     return out
 
 
-def _parse_line(cols, line, delim=','):
-    def _is_not_blank(s):
-        return bool(s and s.strip())
-    out = dict()
+def _parse_line(out, cols, line, delim=','):
     vals = line.split(delim)
-    x = float(vals[0])
-    for cn, rcv in zip(cols, vals):
-        cv = float(rcv) if _is_not_blank(rcv) else None
-        if cn == xcol:
-            if cv is None:
-                raise ValueError('An x value is required for every line.')
-            assert(x == cv)
-            out[xcol] = cv
-        elif cv is not None:
-            if cn in [ycol, wcol]:
-                out[cn] = cv
-            elif cn[-1] == ycol:
-                out[_get_kw(cn)] = (x, cv)
-            elif cn[-1] == wcol:
-                out[_get_kw(cn, False)] = cv
+    nv = {c: float(v) for c, v in zip(cols, vals) if bool(v and v.strip())}
+    try:
+        x = nv[xcol]
+    except KeyError:
+        raise ValueError('Every line must have an x value, but one is missing from line {0}.'.format(line))
+    if ycol in nv:
+        out[xcol] = np.append(out[xcol], x)
+        out[ycol] = np.append(out[ycol], nv[ycol])
+        if wcol in cols:
+            try:
+                out[wcol] = np.append(out[wcol], nv[wcol])
+            except KeyError:
+                raise ValueError('The spec for this file indicates that if a y value is provided, a weight is also required.')
+    for dm in [dre.match(cn) for cn in nv.keys() if dre.match(cn)]:
+        cn, deriv, ct = [dm[i] for i in range(3)]  # column name, deriv, type
+        if ct == ycol:   # handle weights only with y match
+            kw = _get_kw(deriv)
+            out[kw] = np.vstack((out[kw], (x, nv[cn])))
+            assoc_wt_col = dyw_template.format(deriv)
+            if assoc_wt_col in cols:
+                kww = _get_kw(deriv, True)
+                try:
+                    out[kww] = np.append(out[kww], nv[assoc_wt_col])
+                except KeyError:
+                    raise ValueError('The spec for this file indicates that if a value for the {0} derivative is provided, a weight is also required.'.format(deriv))
     return out
 
 

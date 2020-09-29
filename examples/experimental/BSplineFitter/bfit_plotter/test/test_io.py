@@ -49,6 +49,15 @@ class TestIo(ut.TestCase):
         ecols = ['x', 'y', 'w', 'd1y', 'd1w', 'd2y', 'd2w']
         nptest.assert_array_equal(ecols, io._get_expected_cols(2, [0, 1, 2]))
 
+    def test__get_kw_deriv(self):
+        self.assertEqual('set_d1_x', io._get_kw('1', False))
+
+    def test__get_kw_deriv_wt(self):
+        self.assertEqual('set_d2_w', io._get_kw('2', True))
+
+    def test__get_kw_deriv_multidigit(self):
+        self.assertEqual('set_d10_x', io._get_kw('10', False))
+
     def test__initialize_output_xy_only(self):
         cols = ['x', 'y']
         out_dict = io._initialize_output(cols)
@@ -86,55 +95,135 @@ class TestIo(ut.TestCase):
         self.assertEqual(5, len(out_dict.keys()))
         self.assertTrue('x' in out_dict)
         self.assertTrue('y' in out_dict)
-        self.assertTrue('y' in out_dict)
+        self.assertTrue('w' in out_dict)
         self.assertTrue('set_d2_x' in out_dict)
         self.assertTrue('set_d2_w' in out_dict)
         self.assertEqual(0, out_dict['set_d2_w'].size)
         self.assertEqual((0,), out_dict['set_d2_w'].shape)
 
+    def test__initialize_output_xy_d10_weighted(self):
+        cols = ['x', 'y', 'd10y', 'd10w']
+        out_dict = io._initialize_output(cols)
+        self.assertEqual(4, len(out_dict.keys()))
+        self.assertTrue('x' in out_dict)
+        self.assertTrue('y' in out_dict)
+        self.assertTrue('set_d10_x' in out_dict)
+        self.assertEqual(0, out_dict['set_d10_x'].size)
+        self.assertEqual((0,2), out_dict['set_d10_x'].shape)
+        self.assertTrue('set_d10_w' in out_dict)
+        self.assertEqual(0, out_dict['set_d10_w'].size)
+        self.assertEqual((0,), out_dict['set_d10_w'].shape)
+
     def test__parse_line_xy(self):
         cols = ['x', 'y']
         line = '3.4, 5.6'
-        out = io._parse_line(cols, line)
+        out = io._parse_line(io._initialize_output(cols), cols, line)
         self.assertEqual(2, len(out.keys()))
         self.assertEqual(3.4, out['x'])
         self.assertEqual(5.6, out['y'])
 
+    def test__parse_line_xy_second_line(self):
+        cols = ['x', 'y']
+        l1 = '3.4, 5.6'
+        out = io._parse_line(io._initialize_output(cols), cols, l1)
+        l2 = '4.5,6.7'
+        out = io._parse_line(out, cols, l2)
+        nptest.assert_array_equal([3.4, 4.5], out['x'])
+        nptest.assert_array_equal([5.6, 6.7], out['y'])
+
     def test__parse_line_xyw(self):
         cols = ['x', 'y', 'w']
-        line = '3.4, 5.6, 2'
-        out = io._parse_line(cols, line)
+        l1 = '3.4, 5.6, 2'
+        l2 = '4.5,6.7,1.5'
+        out = io._parse_line(io._initialize_output(cols), cols, l1)
+        out = io._parse_line(out, cols, l2)
         self.assertEqual(3, len(out.keys()))
-        self.assertEqual(3.4, out['x'])
-        self.assertEqual(5.6, out['y'])
-        self.assertEqual(2.0, out['w'])
+        nptest.assert_array_equal([3.4, 4.5], out['x'])
+        nptest.assert_array_equal([5.6, 6.7], out['y'])
+        nptest.assert_array_equal([2.0, 1.5], out['w'])
 
     def test__parse_line_xy_d1unweighted(self):
         cols = ['x', 'y', 'd1y']
-        line = '3.4, 5.6, 2'
-        out = io._parse_line(cols, line)
-        self.assertEqual(3, len(out.keys()))
-        self.assertEqual(3.4, out['x'])
-        self.assertEqual(5.6, out['y'])
-        self.assertEqual((3.4, 2.0), out['set_d1_x'])
+        l1 = '3.4, 5.6, 2'
+        l2 = '4.5, 6.7, 0'
+        out = io._parse_line(io._initialize_output(cols), cols, l1)
+        out = io._parse_line(out, cols, l2)
+        nptest.assert_array_equal([3.4, 4.5], out['x'])
+        nptest.assert_array_equal([5.6, 6.7], out['y'])
+        nptest.assert_array_equal([(3.4, 2.0), (4.5, 0.0)], out['set_d1_x'])
 
     def test__parse_line_xyw_d2unweighted(self):
         cols = ['x', 'y', 'w', 'd2y']
-        line = '3.4, 5.6, 1.5, 0'
-        out = io._parse_line(cols, line)
-        self.assertEqual(4, len(out.keys()))
-        self.assertEqual(3.4, out['x'])
-        self.assertEqual(5.6, out['y'])
-        self.assertEqual(1.5, out['w'])
-        self.assertEqual((3.4, 0.0), out['set_d2_x'])
+        l1 = '3.4, 5.6, 1.5, 0'
+        l2 = '4.5, 6.7, 1.5, 0'
+        out = io._parse_line(io._initialize_output(cols), cols, l1)
+        out = io._parse_line(out, cols, l2)
+        nptest.assert_array_equal([3.4, 4.5], out['x'])
+        nptest.assert_array_equal([5.6, 6.7], out['y'])
+        nptest.assert_array_equal([1.5, 1.5], out['w'])
+        nptest.assert_array_equal([(3.4, 0.0), (4.5, 0.0)], out['set_d2_x'])
 
-    def test__parse_line_xy_d1_d2w(self):
+    def test__parse_line_xy_d1_d2w_incomplete_lines(self):
         cols = ['x', 'y', 'd1y', 'd2y', 'd2w']
-        line = '3.4, 5.6, 0, 1.5, 2'
-        out = io._parse_line(cols, line)
-        self.assertEqual(5, len(out.keys()))
-        self.assertEqual(3.4, out['x'])
-        self.assertEqual(5.6, out['y'])
-        self.assertEqual((3.4, 0.0), out['set_d1_x'])
-        self.assertEqual((3.4, 1.5), out['set_d2_x'])
-        self.assertEqual(2.0, out['set_d2_w'])
+        l1 = '3.4, 5.6'
+        l2 = '4.5, 6.7, 0'
+        l3 = '5.6, ,,0,2'
+        l4 = '7.8, ,1.5,1.6,2.1'
+        out = io._parse_line(io._initialize_output(cols), cols, l1)
+        out = io._parse_line(out, cols, l2)
+        out = io._parse_line(out, cols, l3)
+        out = io._parse_line(out, cols, l4)
+        nptest.assert_array_equal([3.4, 4.5], out['x'])
+        nptest.assert_array_equal([5.6, 6.7], out['y'])
+        nptest.assert_array_equal([(4.5, 0.0), (7.8, 1.5)], out['set_d1_x'])
+        nptest.assert_array_equal([(5.6, 0.0), (7.8, 1.6)], out['set_d2_x'])
+        nptest.assert_array_equal([2.0, 2.1], out['set_d2_w'])
+
+    def test__parse_line_xyw_weight_missing(self):
+        cols = ['x', 'y', 'w']
+        l1 = '3.4, 5.6, 1.2'
+        l2 = '4.5, 6.7'
+        out = io._parse_line(io._initialize_output(cols), cols, l1)
+        self.assertRaisesRegex(ValueError, 'y value .+ weight is also required', io._parse_line, out=out, cols=cols, line=l2)
+
+    def test__parse_line_xy_d2w_weight_missing(self):
+        cols = ['x', 'y', 'd2y', 'd2w']
+        l1 = '3.4, 5.6, 2.4, 1.2'
+        l2 = '4.5, 6.7, 3.2'
+        out = io._parse_line(io._initialize_output(cols), cols, l1)
+        self.assertRaisesRegex(ValueError, '2 derivative .+ weight is also required', io._parse_line, out=out, cols=cols, line=l2)
+
+    def test__parse_line_xyw_ignore_wt_if_no_val(self):
+        cols = ['x', 'y', 'w', 'd1y']
+        l1 = '3.4, 5.6, 1.2'
+        l2 = '4.5, ,1.1, 3.4'
+        out = io._parse_line(io._initialize_output(cols), cols, l1)
+        out = io._parse_line(out, cols, l2)
+        self.assertEqual(4, len(out.keys()))
+        nptest.assert_array_equal([3.4], out['x'])
+        nptest.assert_array_equal([5.6], out['y'])
+        nptest.assert_array_equal([1.2], out['w'])
+        nptest.assert_array_equal([(4.5, 3.4)], out['set_d1_x'])
+
+
+    def test__parse_line_xy_d1w_ignore_wt_if_no_val(self):
+        cols = ['x', 'y', 'd1y', 'd1w']
+        l1 = '3.4, 5.6, 6.7, 1.2'
+        l2 = '4.5, 2.2, , 1.1'
+        out = io._parse_line(io._initialize_output(cols), cols, l1)
+        out = io._parse_line(out, cols, l2)
+        self.assertEqual(4, len(out.keys()))
+        nptest.assert_array_equal([3.4, 4.5], out['x'])
+        nptest.assert_array_equal([5.6, 2.2], out['y'])
+        nptest.assert_array_equal([(3.4, 6.7)], out['set_d1_x'])
+        nptest.assert_array_equal([1.2], out['set_d1_w'])
+
+    def test__parse_line_missing_x(self):
+        cols = ['x', 'y', 'd1y', 'd1w']
+        l1 = '3.4, 5.6, 6.7, 1.2'
+        l2 = ', 3.3, 2.2, 1.1'
+        out = io._parse_line(io._initialize_output(cols), cols, l1)
+        self.assertRaisesRegex(ValueError, 'Every line must have an x', io._parse_line, out=out, cols=cols, line=l2)
+
+
+
