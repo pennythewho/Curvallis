@@ -1,3 +1,4 @@
+from os import path
 import unittest as ut
 import numpy as np
 from numpy import testing as nptest
@@ -247,7 +248,8 @@ class TestIo(ut.TestCase):
         self.assertTrue('set_d2_x' in newout.keys())
 
     def test_load_data(self):
-        out = io.load_data('bfit/test/importtest.csv', 3, with_weights=[2])
+        dir = path.dirname(__file__)
+        out = io.load_data(path.join(dir, 'importtest.csv'), 3, with_weights=[2])
         self.assertEqual(5, len(out.keys()))
         nptest.assert_array_equal([3.4, 4.5, 6.7], out['x'])
         nptest.assert_array_equal([4.5, 5.6, 7.8], out['y'])
