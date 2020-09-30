@@ -225,5 +225,36 @@ class TestIo(ut.TestCase):
         out = io._parse_line(io._initialize_output(cols), cols, l1)
         self.assertRaisesRegex(ValueError, 'Every line must have an x', io._parse_line, out=out, cols=cols, line=l2)
 
+    def test__parse_line_tab_delim(self):
+        cols = ['x', 'y', 'd1y', 'd1w']
+        l1 = '3.4\t5.6\t6.7\t1.2'
+        out = io._parse_line(io._initialize_output(cols), cols, l1, '\t')
+        nptest.assert_array_equal([3.4], out['x'])
+        nptest.assert_array_equal([5.6], out['y'])
+        nptest.assert_array_equal([(3.4,6.7)], out['set_d1_x'])
+        nptest.assert_array_equal([1.2], out['set_d1_w'])
+
+    def test__remove_empty_keys_none_empty(self):
+        out = {'x': [3.4, 4.5], 'y': [5.6, 2.2]}
+        nptest.assert_array_equal(out, io._remove_empty_keys(out))
+
+    def test__remove_empty_keys_empty_deriv(self):
+        out = {'x':[3.4, 4.5], 'y':[5.6, 2.2], 'set_d1_x':[], 'set_d2_x':[(3.4, 6.7), (4.5, 7.8)]}
+        newout = io._remove_empty_keys(out)
+        self.assertFalse('set_d1_x' in newout.keys())
+        self.assertTrue('x' in newout.keys())
+        self.assertTrue('y' in newout.keys())
+        self.assertTrue('set_d2_x' in newout.keys())
+
+    def test_load_data(self):
+        out = io.load_data('bfit/test/importtest.csv', 3, with_weights=[2])
+        self.assertEqual(5, len(out.keys()))
+        nptest.assert_array_equal([3.4, 4.5, 6.7], out['x'])
+        nptest.assert_array_equal([4.5, 5.6, 7.8], out['y'])
+        nptest.assert_array_equal([(5.6, 2.3), (6.7, 2.0)], out['set_d1_x'])
+        nptest.assert_array_equal([(4.5, 1.2), (5.6, 0.0), (6.7, 1.0)], out['set_d2_x'])
+        nptest.assert_array_equal([1.1, 1.5, 1.1], out['set_d2_w'])
+
+
 
 

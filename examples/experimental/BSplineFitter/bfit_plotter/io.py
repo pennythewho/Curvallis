@@ -42,13 +42,18 @@ def load_data(path, p, with_weights=[]):
     # determine expected columns and initialize dictionary with expected keys
     cols = _get_expected_cols(p, with_weights)
     out = _initialize_output(cols)
-    # is file present?
-    # load file as csv
-    #
-    # line by line
-        # column by column
-    # remove empty keys
-    pass
+    try:
+        with open(path) as f:
+            ln = f.readline()
+            while ln:
+                out = _parse_line(out, cols, ln)
+                ln = f.readline()
+    except FileNotFoundError as fe:
+        raise fe
+    except Exception as e:
+        raise IOError('Cannot load data from '+path+' -- '+str(e))
+    out = _remove_empty_keys(out)
+    return out
 
 def _get_expected_cols(p, with_weights):
     """ returns an ordered list of columns in the data file """
@@ -107,6 +112,10 @@ def _parse_line(out, cols, line, delim=','):
                     raise ValueError('The spec for this file indicates that if a value for the {0} derivative is provided, a weight is also required.'.format(deriv))
     return out
 
+
+def _remove_empty_keys(out):
+    # removes unused derivatives
+    return {k: v for (k, v) in out.items() if len(v) > 0}
 
 
 
