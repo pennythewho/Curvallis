@@ -10,13 +10,28 @@ re_deriv_constraints = re.compile(r'({0}|{1})_d(\d+)_x'.format(set_kw, minimize_
 
 class BsplineCurve(object):
     def __init__(self, p, knots, coefs):
+        if len(knots) != len(coefs) + p + 1:
+            raise ValueError('The number of knots must equal the number of coefficients + p + 1.')
         self._degree = p
-        self._knots = knots
-        self._coefs = coefs
+        self._knots = np.asarray(knots)
+        self._coefs = np.asarray(coefs)
 
     def __call__(self, x):
         A = bf.get_collocation_matrix(self._degree, self._knots, x)
         return A @ self._coefs
+
+    def __eq__(self, other):
+        return self._degree == other._degree and self._knots.size == other._knots.size and \
+               self._coefs.size == other._coefs.size and \
+               all(self._knots == other._knots) and all(self._coefs == other._coefs)
+
+    def __str__(self):
+        return str({'p': self._degree, 'knots': self._knots.tolist(), 'coefs': self._coefs.tolist()})
+
+    def __repr__(self):
+        return type(self).__name__+"(p="+str(self._degree)+", knots="+str(self._knots.tolist())+", coefs="+\
+               str(self._coefs.tolist())+")"
+
 
 
 def validate_knots_and_data(p, knots, x):

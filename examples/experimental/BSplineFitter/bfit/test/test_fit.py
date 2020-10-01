@@ -3,6 +3,7 @@ import numpy as np
 from numpy.random import random_sample
 from numpy import testing as nptest
 from .. import fit, basis_function as bf
+from ..fit import BsplineCurve   # used in eval statement in repr test - do not remove
 
 class TestFit(ut.TestCase):
     def setUp(self):
@@ -462,6 +463,55 @@ class TestFit(ut.TestCase):
         knots = fit.augment_knots(p, [3, 5, 7], [0, 10])
         p3 = np.poly1d([3, 4, 5], r=True)
         self.assertRaisesRegex(ValueError, 'at least one', fit.get_bspline_fit, p=p, knots=knots, x=[], y=[], minimize_d1_x=p3.deriv(1).roots)
+
+    def test_BsplineCurve_init_mismatched_parms(self):
+        p = 2
+        coefs = [8, 9, 10, 11]      # n = 3
+        knots = [1, 1, 1, 3, 3, 3]  # m = 5 (should be 6)
+        self.assertRaises(ValueError, fit.BsplineCurve, p=p, knots=knots, coefs=coefs)
+
+    def test_BsplineCurve_eq_all_same_except_degree(self):
+        p = 2
+        knots = [1, 1, 1, 2, 3, 3, 3]
+        coefs = [8, 9, 10, 11]
+        bsp1 = fit.BsplineCurve(p, knots, coefs)
+        bsp2 = fit.BsplineCurve(2, [1, 1, 1, 2, 3, 3, 3], [8, 9, 10, 11])
+        self.assertTrue(bsp1 == bsp2)
+
+    def test_BsplineCurve_eq_mismatched_knots(self):
+        p = 2
+        coefs = [8, 9, 10, 11]
+        bsp1 = fit.BsplineCurve(p, [1, 1, 1, 2, 3, 3, 3], coefs)
+        bsp2 = fit.BsplineCurve(p, [1, 1, 1, 2.5, 3, 3, 3], coefs)
+        self.assertFalse(bsp1 == bsp2)
+
+    def test_BsplineCurve_eq_mismatched_coefs(self):
+        p = 2
+        knots = [1, 1, 1, 2, 3, 3, 3]
+        bsp1 = fit.BsplineCurve(p, knots, [8, 9, 10, 11])
+        bsp2 = fit.BsplineCurve(p, knots, [8, 8.9, 10, 11])
+        self.assertFalse(bsp1 == bsp2)
+
+    def test_BsplineCurve_str(self):
+        p = 2
+        knots = [1, 1, 1, 2, 3, 3, 3]
+        coefs = [8, 9, 10, 11]
+        bsp_str = str(fit.BsplineCurve(p, knots, coefs))
+        expected = {'p': p, 'knots': knots, 'coefs': coefs}
+        actual = eval(bsp_str)
+        self.assertDictEqual(expected, actual)
+
+    def test_BsplineCurve_repr(self):
+        p = 2
+        knots = [1, 1, 1, 2, 3, 3, 3]
+        coefs = [8, 9, 10, 11]
+        bsp = fit.BsplineCurve(p, knots, coefs)
+        exp = 'BsplineCurve(p=2, knots=[1, 1, 1, 2, 3, 3, 3], coefs=[8, 9, 10, 11])'
+        self.assertEqual(exp, repr(bsp))
+        bsp2 = eval(repr(bsp))
+        self.assertEqual(bsp, bsp2)
+
+
 
 
 
